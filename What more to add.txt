@@ -1,0 +1,8 @@
+1. Mutliple API keys (huggingface more, gemini , groq, more , etc)
+2. To include live video recording and analyzing 
+3. To improve Results.js by integrating the answers given to api to analyze the answers and give the marks per questions accordingly out of 10, and also include what else was needed in the answer
+4. to store the last chats into the database into the supabase
+5. to check out the past or recent activities
+6. to checkout the quick actions like new interview, view analytics, study resources, settings
+7. to include resume for input and analyzing the input for asking questions about resume, how good is resume
+8. When i click on Generate Interview, i have to click 2 times , 1st time it doesn't work i have to fix that too
