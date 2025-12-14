@@ -1,9 +1,7 @@
 // frontend/src/services/interviewApi.js
 
-// Backend API URL - Your Render deployment
-const API_BASE_URL = import.meta.env.VITE_API_URL || 
-                     import.meta.env.REACT_APP_API_URL || 
-                     "https://prepmate-ai-backend-ckrb.onrender.com/api";
+// Direct API URL - No environment variables needed
+const API_BASE_URL = "https://prepmate-ai-backend-ckrb.onrender.com/api";
 
 console.log("🌐 API Base URL:", API_BASE_URL);
 
