@@ -23,7 +23,7 @@ HF_API_KEY = os.getenv("HF_API_KEY")
 
 # Available FREE Llama models:
 # Option 1: Meta Llama 3.1 8B (RECOMMENDED)
-MODEL = "meta-llama/Meta-Llama-3.1-8B-Instruct"
+MODEL = "meta-llama/Llama-3.1-8B-Instruct"
 
 # Option 2: Mistral 7B (Alternative)
 # MODEL = "mistralai/Mistral-7B-Instruct-v0.2"
