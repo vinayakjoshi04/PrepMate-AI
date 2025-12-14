@@ -8,7 +8,7 @@ import re
 from huggingfaceService import extract_skills, generate_questions, call_huggingface, extract_json_from_text
 
 app = Flask(__name__)
-CORS(app)  # Allow frontend calls
+CORS(app, origins=["https://prep-mate-o3he0rffn-vinayak-vivek-joshis-projects.vercel.app/"])  # Allow frontend calls
 
 @app.route("/", methods=["GET"])
 def root():
