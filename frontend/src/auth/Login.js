@@ -52,9 +52,17 @@ export default function Login() {
       
       if (authError) throw authError;
       
-      // Success - navigate to dashboard
+      // Success - Check user role and navigate accordingly
       console.log("Login successful!", data);
-      navigate("/dashboard");
+      
+      const userRole = data.user?.user_metadata?.role;
+      
+      if (userRole === "recruiter") {
+        navigate("/recruiter-dashboard");
+      } else {
+        // Default to candidate dashboard
+        navigate("/dashboard");
+      }
       
     } catch (err) {
       console.error("Login error:", err);

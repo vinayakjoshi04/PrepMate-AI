@@ -380,7 +380,122 @@ body {
   width: 100%;
 }
 
-/* ========== NEW: ERROR & SUCCESS MESSAGES ========== */
+/* ========== NEW: ROLE SELECTION STYLES ========== */
+.role-selection {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.role-button {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 20px 16px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-family: 'Inter', sans-serif;
+  text-align: center;
+}
+
+.role-button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(102, 126, 234, 0.4);
+  transform: translateY(-2px);
+}
+
+.role-button.active {
+  background: rgba(102, 126, 234, 0.15);
+  border-color: #667eea;
+  box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+}
+
+.role-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.role-button:focus-visible {
+  outline: 2px solid #667eea;
+  outline-offset: 2px;
+}
+
+.role-icon {
+  width: 48px;
+  height: 48px;
+  background: rgba(102, 126, 234, 0.2);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+}
+
+.role-button.active .role-icon {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+}
+
+.role-icon svg {
+  width: 24px;
+  height: 24px;
+  color: #667eea;
+}
+
+.role-button.active .role-icon svg {
+  color: #ffffff;
+}
+
+.role-content h4 {
+  font-size: 15px;
+  font-weight: 700;
+  color: #ffffff;
+  margin-bottom: 4px;
+}
+
+.role-content p {
+  font-size: 13px;
+  color: #a0aec0;
+  font-weight: 400;
+}
+
+.role-check {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: scaleIn 0.3s ease-out;
+}
+
+@keyframes scaleIn {
+  from {
+    transform: scale(0);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+.role-check svg {
+  width: 14px;
+  height: 14px;
+  color: #ffffff;
+}
+/* ================================================= */
+
+/* ========== ERROR & SUCCESS MESSAGES ========== */
 .error-message {
   display: flex;
   align-items: flex-start;
@@ -494,7 +609,7 @@ body {
   cursor: not-allowed;
 }
 
-/* ========== NEW: VALIDATION STATES ========== */
+/* ========== VALIDATION STATES ========== */
 .input-group input[aria-invalid="true"] {
   border-color: rgba(239, 68, 68, 0.5);
   background: rgba(239, 68, 68, 0.05);
@@ -513,7 +628,7 @@ body {
   margin-top: 8px;
 }
 
-/* ========== NEW: PASSWORD STRENGTH ========== */
+/* ========== PASSWORD STRENGTH ========== */
 .password-strength {
   margin-top: 8px;
   display: flex;
@@ -587,7 +702,7 @@ body {
   cursor: not-allowed;
 }
 
-/* ========== NEW: FOCUS STATES ========== */
+/* ========== FOCUS STATES ========== */
 .submit-button:focus-visible {
   outline: 2px solid #ffffff;
   outline-offset: 2px;
@@ -672,7 +787,7 @@ body {
   transform: translateY(-2px);
 }
 
-/* ========== NEW: FOCUS STATES ========== */
+/* ========== FOCUS STATES ========== */
 .social-button:focus-visible {
   outline: 2px solid #667eea;
   outline-offset: 2px;
@@ -704,7 +819,7 @@ body {
   text-decoration: underline;
 }
 
-/* ========== NEW: FOCUS STATES ========== */
+/* ========== FOCUS STATES ========== */
 .footer-link:focus-visible {
   outline: 2px solid #667eea;
   outline-offset: 2px;
@@ -730,7 +845,7 @@ body {
   text-decoration: underline;
 }
 
-/* ========== NEW: FOCUS STATES ========== */
+/* ========== FOCUS STATES ========== */
 .terms-link:focus-visible {
   outline: 2px solid #667eea;
   outline-offset: 2px;
@@ -770,7 +885,7 @@ body {
     grid-template-columns: 1fr;
   }
   
-  /* ========== NEW: MOBILE TOUCH TARGETS ========== */
+  /* ========== MOBILE TOUCH TARGETS ========== */
   .submit-button,
   .social-button {
     min-height: 48px;
@@ -781,10 +896,14 @@ body {
     font-size: 16px; /* Prevents iOS zoom */
     min-height: 48px;
   }
+  
+  .role-selection {
+    grid-template-columns: 1fr;
+  }
   /* ============================================== */
 }
 
-/* ========== NEW: HIGH CONTRAST MODE ========== */
+/* ========== HIGH CONTRAST MODE ========== */
 @media (prefers-contrast: high) {
   .input-group input {
     border-width: 2px;
@@ -796,7 +915,7 @@ body {
 }
 /* ============================================ */
 
-/* ========== NEW: PRINT STYLES ========== */
+/* ========== PRINT STYLES ========== */
 @media print {
   .bg-gradient,
   .branding-image,

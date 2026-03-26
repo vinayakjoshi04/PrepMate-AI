@@ -1,229 +1,276 @@
 import { supabase } from "../supabaseClient";
 import { useNavigate } from "react-router-dom";
+import { createElement as h } from "react";
 import "./dashboard.css";
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  
+
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    navigate("/login");
+    try {
+      await supabase.auth.signOut();
+      navigate("/login");
+    } catch (error) {
+      console.error("Logout error:", error);
+    }
   };
 
-  return (
-    <div className="dashboard-container">
-      {/* Header */}
-      <header className="dashboard-header">
-        <div className="dashboard-brand">
-          <div className="dashboard-brand-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-            </svg>
-          </div>
-          <div className="dashboard-brand-text">
-            <span className="dashboard-brand-name">PrepMate</span>
-            <span className="dashboard-brand-ai">AI</span>
-          </div>
-        </div>
-        <div className="dashboard-header-actions">
-          <button className="logout-btn" onClick={handleLogout}>
-            Logout
-          </button>
-        </div>
-      </header>
+  const modules = [
+    {
+      id: "interview",
+      tag: "Module 01",
+      title: "AI Mock Interview",
+      subtitle: "Simulate. Practice. Ace It.",
+      description:
+        "Jump into a fully simulated AI-powered interview session tailored to your job role and experience level. Our AI interviewer asks real-world technical and behavioral questions, evaluates your answers in real time, and provides detailed feedback — just like a real interviewer would. Perfect for freshers and experienced professionals alike.",
+      highlights: [
+        "Role-specific question banks",
+        "Real-time answer evaluation",
+        "Detailed post-interview report",
+        "Behavioral & technical rounds",
+      ],
+      cta: "Start Interview",
+      path: "/create-interview",
+      accent: "#667eea",
+      accentSecondary: "#764ba2",
+      icon: h("svg", { fill: "none", viewBox: "0 0 24 24", stroke: "currentColor" },
+        h("path", {
+          strokeLinecap: "round",
+          strokeLinejoin: "round",
+          strokeWidth: 1.5,
+          d: "M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+        })
+      ),
+      badge: "Most Popular",
+    },
+    {
+      id: "resume",
+      tag: "Module 02",
+      title: "Resume Analyzer",
+      subtitle: "Parse. Score. Improve.",
+      description:
+        "Upload your resume and let our AI dissect it from every angle. We analyze your formatting, content quality, keyword density, and ATS compatibility. You'll receive an ATS score, section-by-section feedback, and an improved version of your resume tailored for modern applicant tracking systems used by top companies.",
+      highlights: [
+        "ATS compatibility scoring",
+        "Section-by-section feedback",
+        "Keyword gap analysis",
+        "AI-enhanced resume output",
+      ],
+      cta: "Analyze Resume",
+      path: "/resume-analyzer",
+      accent: "#f093fb",
+      accentSecondary: "#f5576c",
+      icon: h("svg", { fill: "none", viewBox: "0 0 24 24", stroke: "currentColor" },
+        h("path", {
+          strokeLinecap: "round",
+          strokeLinejoin: "round",
+          strokeWidth: 1.5,
+          d: "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+        })
+      ),
+      badge: "Smart AI",
+    },
+    {
+      id: "roadmap",
+      tag: "Module 03",
+      title: "Skill Gap & Roadmap",
+      subtitle: "Compare. Identify. Grow.",
+      description:
+        "Paste any Job Description and let our AI compare it against your resume to find exactly where you stand. It identifies missing technical skills, tools, and experiences — then generates a personalized learning roadmap with resources, milestones, and timelines to help you close the gap and become the ideal candidate.",
+      highlights: [
+        "JD vs Resume gap analysis",
+        "Missing skills identification",
+        "Personalized learning roadmap",
+        "Resource & timeline planning",
+      ],
+      cta: "Build My Roadmap",
+      path: "/skill-roadmap",
+      accent: "#43e97b",
+      accentSecondary: "#38f9d7",
+      icon: h("svg", { fill: "none", viewBox: "0 0 24 24", stroke: "currentColor" },
+        h("path", {
+          strokeLinecap: "round",
+          strokeLinejoin: "round",
+          strokeWidth: 1.5,
+          d: "M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"
+        })
+      ),
+      badge: "New",
+    },
+  ];
 
-      {/* Main Content */}
-      <main className="dashboard-main">
-        {/* Hero Section */}
-        <section className="dashboard-hero">
-          <h1>Welcome to PrepMate AI</h1>
-          <p>AI-Powered Interview Preparation System</p>
-          <button 
-            className="dashboard-cta-primary" 
-            onClick={() => navigate("/create-interview")}
-          >
-            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
-            Start New Interview
-          </button>
-        </section>
+  return h("div", { className: "dashboard-container" },
+    // Ambient background orbs
+    h("div", { className: "orb orb-1" }),
+    h("div", { className: "orb orb-2" }),
+    h("div", { className: "orb orb-3" }),
 
-        {/* Stats Section */}
-        <section className="dashboard-stats">
-          <div className="dashboard-stat-card">
-            <div className="dashboard-stat-header">
-              <div className="dashboard-stat-icon">
-                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <span className="dashboard-stat-trend">
-                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                </svg>
-                +12%
-              </span>
-            </div>
-            <div className="dashboard-stat-value">24</div>
-            <div className="dashboard-stat-label">Completed Interviews</div>
-          </div>
+    // Header
+    h("header", { className: "dashboard-header" },
+      h("div", { className: "dashboard-brand" },
+        h("div", { className: "dashboard-brand-icon" },
+          h("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", "aria-hidden": "true" },
+            h("path", {
+              strokeLinecap: "round",
+              strokeLinejoin: "round",
+              strokeWidth: 2,
+              d: "M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+            })
+          )
+        ),
+        h("div", { className: "dashboard-brand-text" },
+          h("span", { className: "dashboard-brand-name" }, "PrepMate"),
+          h("span", { className: "dashboard-brand-ai" }, "AI")
+        )
+      ),
+      h("nav", { className: "dashboard-nav" },
+        h("span", { className: "dashboard-nav-item active" }, "Dashboard"),
+        h("span", { className: "dashboard-nav-item" }, "History"),
+        h("span", { className: "dashboard-nav-item" }, "Settings")
+      ),
+      h("button", { className: "logout-btn", onClick: handleLogout },
+        h("svg", { fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", width: "16", height: "16" },
+          h("path", {
+            strokeLinecap: "round",
+            strokeLinejoin: "round",
+            strokeWidth: 2,
+            d: "M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+          })
+        ),
+        "Logout"
+      )
+    ),
 
-          <div className="dashboard-stat-card">
-            <div className="dashboard-stat-header">
-              <div className="dashboard-stat-icon">
-                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <span className="dashboard-stat-trend">
-                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                </svg>
-                +8%
-              </span>
-            </div>
-            <div className="dashboard-stat-value">6.5h</div>
-            <div className="dashboard-stat-label">Practice Time</div>
-          </div>
+    h("main", { className: "dashboard-main" },
 
-          <div className="dashboard-stat-card">
-            <div className="dashboard-stat-header">
-              <div className="dashboard-stat-icon">
-                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                </svg>
-              </div>
-              <span className="dashboard-stat-trend">
-                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                </svg>
-                +15%
-              </span>
-            </div>
-            <div className="dashboard-stat-value">85%</div>
-            <div className="dashboard-stat-label">Average Score</div>
-          </div>
-        </section>
+      // Hero
+      h("section", { className: "dashboard-hero" },
+        h("div", { className: "hero-eyebrow" },
+          h("span", { className: "hero-dot" }),
+          "Your Interview Preparation Hub"
+        ),
+        h("h1", { className: "hero-title" },
+          "Land Your ",
+          h("span", { className: "hero-gradient" }, "Dream Job"),
+          h("br"),
+          "with AI Precision"
+        ),
+        h("p", { className: "hero-subtitle" },
+          "Three powerful modules designed to take you from applicant to offer letter. Practice interviews, perfect your resume, and close every skill gap."
+        ),
+        h("div", { className: "hero-stats" },
+          h("div", { className: "hero-stat" },
+            h("span", { className: "hero-stat-value" }, "24"),
+            h("span", { className: "hero-stat-label" }, "Interviews Done")
+          ),
+          h("div", { className: "hero-stat-divider" }),
+          h("div", { className: "hero-stat" },
+            h("span", { className: "hero-stat-value" }, "85%"),
+            h("span", { className: "hero-stat-label" }, "Avg Score")
+          ),
+          h("div", { className: "hero-stat-divider" }),
+          h("div", { className: "hero-stat" },
+            h("span", { className: "hero-stat-value" }, "6.5h"),
+            h("span", { className: "hero-stat-label" }, "Practice Time")
+          )
+        )
+      ),
 
-        {/* Quick Actions */}
-        <section className="dashboard-actions">
-          <h2 className="dashboard-section-title">Quick Actions</h2>
-          <div className="dashboard-actions-grid">
-            <div 
-              className="dashboard-action-card" 
-              onClick={() => navigate("/create-interview")}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => e.key === 'Enter' && navigate("/create-interview")}
-            >
-              <div className="dashboard-action-icon">
-                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-              </div>
-              <h3 className="dashboard-action-title">New Interview</h3>
-              <p className="dashboard-action-description">
-                Start a fresh interview session with AI-powered questions
-              </p>
-            </div>
+      // Module Cards
+      h("section", { className: "modules-section" },
+        h("div", { className: "modules-label" }, "Choose Your Module"),
+        h("div", { className: "modules-grid" },
+          modules.map((mod, index) =>
+            h("div", {
+              key: mod.id,
+              className: "module-card",
+              style: { 
+                "--accent": mod.accent, 
+                "--accent-2": mod.accentSecondary, 
+                "--delay": `${index * 0.12}s` 
+              }
+            },
+              // Card glow
+              h("div", { className: "module-card-glow" }),
 
-            <div 
-              className="dashboard-action-card"
-              role="button"
-              tabIndex={0}
-            >
-              <div className="dashboard-action-icon">
-                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                </svg>
-              </div>
-              <h3 className="dashboard-action-title">View Analytics</h3>
-              <p className="dashboard-action-description">
-                Track your progress and identify areas for improvement
-              </p>
-            </div>
+              // Top row
+              h("div", { className: "module-card-top" },
+                h("div", { className: "module-icon-wrap" }, mod.icon),
+                h("div", { className: "module-meta" },
+                  h("span", { className: "module-tag" }, mod.tag),
+                  mod.badge && h("span", { className: "module-badge" }, mod.badge)
+                )
+              ),
 
-            <div 
-              className="dashboard-action-card"
-              role="button"
-              tabIndex={0}
-            >
-              <div className="dashboard-action-icon">
-                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                </svg>
-              </div>
-              <h3 className="dashboard-action-title">Study Resources</h3>
-              <p className="dashboard-action-description">
-                Access curated materials and practice questions
-              </p>
-            </div>
+              // Title
+              h("h2", { className: "module-title" }, mod.title),
+              h("p", { className: "module-subtitle" }, mod.subtitle),
 
-            <div 
-              className="dashboard-action-card"
-              role="button"
-              tabIndex={0}
-            >
-              <div className="dashboard-action-icon">
-                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-              </div>
-              <h3 className="dashboard-action-title">Settings</h3>
-              <p className="dashboard-action-description">
-                Customize your interview preferences and profile
-              </p>
-            </div>
-          </div>
-        </section>
+              // Divider
+              h("div", { className: "module-divider" }),
 
-        {/* Recent Activity */}
-        <section className="dashboard-activity">
-          <div className="dashboard-activity-header">
-            <h2 className="dashboard-section-title">Recent Activity</h2>
-            <a href="#" className="dashboard-activity-link">View All</a>
-          </div>
-          <div className="dashboard-activity-list">
-            <div className="dashboard-activity-item">
-              <div className="dashboard-activity-item-icon">
-                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <div className="dashboard-activity-item-content">
-                <div className="dashboard-activity-item-title">Completed Technical Interview</div>
-                <div className="dashboard-activity-item-time">2 hours ago</div>
-              </div>
-            </div>
+              // Description
+              h("p", { className: "module-description" }, mod.description),
 
-            <div className="dashboard-activity-item">
-              <div className="dashboard-activity-item-icon">
-                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-              </div>
-              <div className="dashboard-activity-item-content">
-                <div className="dashboard-activity-item-title">Started Behavioral Practice</div>
-                <div className="dashboard-activity-item-time">Yesterday</div>
-              </div>
-            </div>
+              // Highlights
+              h("ul", { className: "module-highlights" },
+                mod.highlights.map((highlight, i) =>
+                  h("li", { key: i, className: "module-highlight-item" },
+                    h("svg", { fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", className: "check-icon" },
+                      h("path", {
+                        strokeLinecap: "round",
+                        strokeLinejoin: "round",
+                        strokeWidth: 2.5,
+                        d: "M5 13l4 4L19 7"
+                      })
+                    ),
+                    highlight
+                  )
+                )
+              ),
 
-            <div className="dashboard-activity-item">
-              <div className="dashboard-activity-item-icon">
-                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                </svg>
-              </div>
-              <div className="dashboard-activity-item-content">
-                <div className="dashboard-activity-item-title">Reviewed Study Materials</div>
-                <div className="dashboard-activity-item-time">2 days ago</div>
-              </div>
-            </div>
-          </div>
-        </section>
-      </main>
-    </div>
+              // CTA
+              h("button", {
+                className: "module-cta",
+                onClick: () => navigate(mod.path)
+              },
+                mod.cta,
+                h("svg", { fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", width: "18", height: "18" },
+                  h("path", {
+                    strokeLinecap: "round",
+                    strokeLinejoin: "round",
+                    strokeWidth: 2,
+                    d: "M13 7l5 5m0 0l-5 5m5-5H6"
+                  })
+                )
+              )
+            )
+          )
+        )
+      ),
+
+      // Recent Activity
+      h("section", { className: "activity-section" },
+        h("div", { className: "activity-header" },
+          h("h3", { className: "activity-title" }, "Recent Activity"),
+          h("a", { href: "#", className: "activity-view-all" }, "View All →")
+        ),
+        h("div", { className: "activity-list" },
+          [
+            { label: "Completed Technical Interview", time: "2 hours ago", color: "#667eea" },
+            { label: "Uploaded Resume for Analysis", time: "Yesterday", color: "#f093fb" },
+            { label: "Generated Skill Roadmap — Frontend Dev", time: "2 days ago", color: "#43e97b" },
+          ].map((item, i) =>
+            h("div", { className: "activity-item", key: i },
+              h("div", { className: "activity-dot", style: { background: item.color } }),
+              h("div", { className: "activity-content" },
+                h("span", { className: "activity-name" }, item.label),
+                h("span", { className: "activity-time" }, item.time)
+              )
+            )
+          )
+        )
+      )
+    )
   );
 }

@@ -13,6 +13,9 @@ import CreateInterview from "./pages/CreateInterview";
 import SkillsReview from "./pages/SkillsReview";
 import Interview from "./pages/Interview";
 import Results from "./pages/Results";
+import RecruiterDashboard from "./pages/RecruiterDashboard";
+import ResumeAnalyzer from "./pages/ResumeAnalyzer";
+import SkillRoadmap from "./pages/SkillRoadmap";
 import ProtectedRoute from "./auth/ProtectedRoute";
 
 function App() {
@@ -20,20 +23,17 @@ function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setLoading(false);
     });
 
-    // Listen for auth changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
     });
 
-    // Cleanup function with proper null check
     return () => {
       if (subscription && typeof subscription.unsubscribe === 'function') {
         subscription.unsubscribe();
@@ -41,7 +41,6 @@ function App() {
     };
   }, []);
 
-  // Show loading state while checking authentication
   if (loading) {
     return (
       <div style={{
@@ -74,62 +73,38 @@ function App() {
     );
   }
 
+  const userRole = session?.user?.user_metadata?.role;
+  const defaultRedirect = userRole === "recruiter" ? "/recruiter-dashboard" : "/dashboard";
+
   return (
     <BrowserRouter>
       <Routes>
         {/* Public Landing Page */}
         <Route path="/" element={<Home />} />
 
-        {/* Authentication Routes - Redirect to dashboard if already logged in */}
-        <Route 
-          path="/login" 
-          element={session ? <Navigate to="/dashboard" replace /> : <Login />} 
+        {/* Authentication Routes */}
+        <Route
+          path="/login"
+          element={session ? <Navigate to={defaultRedirect} replace /> : <Login />}
         />
-        <Route 
-          path="/signup" 
-          element={session ? <Navigate to="/dashboard" replace /> : <Signup />} 
+        <Route
+          path="/signup"
+          element={session ? <Navigate to={defaultRedirect} replace /> : <Signup />}
         />
 
-        {/* Protected Routes */}
+        {/* Protected Candidate Routes */}
+        <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+        <Route path="/create-interview" element={<ProtectedRoute><CreateInterview /></ProtectedRoute>} />
+        <Route path="/skills-review" element={<ProtectedRoute><SkillsReview /></ProtectedRoute>} />
+        <Route path="/interview" element={<ProtectedRoute><Interview /></ProtectedRoute>} />
+        <Route path="/results" element={<ProtectedRoute><Results /></ProtectedRoute>} />
+        <Route path="/resume-analyzer" element={<ProtectedRoute><ResumeAnalyzer /></ProtectedRoute>} />
+        <Route path="/skill-roadmap" element={<ProtectedRoute><SkillRoadmap /></ProtectedRoute>} />
+
+        {/* Recruiter Route */}
         <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute>
-              <Dashboard />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/create-interview"
-          element={
-            <ProtectedRoute>
-              <CreateInterview />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/skills-review"
-          element={
-            <ProtectedRoute>
-              <SkillsReview />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/interview"
-          element={
-            <ProtectedRoute>
-              <Interview />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/results"
-          element={
-            <ProtectedRoute>
-              <Results />
-            </ProtectedRoute>
-          }
+          path="/recruiter-dashboard"
+          element={<ProtectedRoute requiredRole="recruiter"><RecruiterDashboard /></ProtectedRoute>}
         />
 
         {/* Fallback Route */}

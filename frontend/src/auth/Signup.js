@@ -6,13 +6,25 @@ import "./auth.css";
 export default function Signup() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [role, setRole] = useState(""); // New: Track selected role
   const [loading, setLoading] = useState(false);
 
   const handleSignup = async () => {
+    // Validation: Check if role is selected
+    if (!role) {
+      alert("Please select your role (Candidate or Recruiter)");
+      return;
+    }
+
     setLoading(true);
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
+      options: {
+        data: {
+          role: role, // Store role in user metadata
+        },
+      },
     });
     setLoading(false);
     if (error) alert(error.message);
@@ -107,6 +119,60 @@ export default function Signup() {
           </div>
 
           <div className="form-body">
+            {/* NEW: Role Selection */}
+            <div className="input-group">
+              <label>I am a</label>
+              <div className="role-selection">
+                <button
+                  type="button"
+                  className={`role-button ${role === "candidate" ? "active" : ""}`}
+                  onClick={() => setRole("candidate")}
+                  disabled={loading}
+                >
+                  <div className="role-icon">
+                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                  </div>
+                  <div className="role-content">
+                    <h4>Candidate</h4>
+                    <p>Prepare for interviews</p>
+                  </div>
+                  {role === "candidate" && (
+                    <div className="role-check">
+                      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  className={`role-button ${role === "recruiter" ? "active" : ""}`}
+                  onClick={() => setRole("recruiter")}
+                  disabled={loading}
+                >
+                  <div className="role-icon">
+                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <div className="role-content">
+                    <h4>Recruiter</h4>
+                    <p>Conduct AI interviews</p>
+                  </div>
+                  {role === "recruiter" && (
+                    <div className="role-check">
+                      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                  )}
+                </button>
+              </div>
+            </div>
+
             <div className="input-group">
               <label htmlFor="email">Email Address</label>
               <input

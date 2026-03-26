@@ -2,7 +2,7 @@ import { Navigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { supabase } from "../supabaseClient";
 
-export default function ProtectedRoute({ children }) {
+export default function ProtectedRoute({ children, requiredRole }) {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -60,5 +60,14 @@ export default function ProtectedRoute({ children }) {
     );
   }
 
-  return session ? children : <Navigate to="/login" />;
+  if (!session) return <Navigate to="/login" />;
+
+  if (requiredRole) {
+    const userRole = session.user?.user_metadata?.role;
+    if (userRole !== requiredRole) {
+      return <Navigate to={userRole === "recruiter" ? "/recruiter-dashboard" : "/dashboard"} />;
+    }
+  }
+
+  return children;
 }
