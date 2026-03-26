@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "../supabaseClient";
 import { Link, useNavigate } from "react-router-dom";
 import "./auth.css";
@@ -9,71 +9,42 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
-  // Email validation helper
-  const isValidEmail = (email) => {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-  };
+  useEffect(() => {
+    const timer = setTimeout(() => setMounted(true), 50);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
   const handleLogin = async (e) => {
     e?.preventDefault();
-    
-    // Clear previous errors
     setError("");
 
-    // Client-side validation
-    if (!email.trim()) {
-      setError("Please enter your email address");
-      return;
-    }
-
-    if (!isValidEmail(email)) {
-      setError("Please enter a valid email address");
-      return;
-    }
-
-    if (!password) {
-      setError("Please enter your password");
-      return;
-    }
-
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters");
-      return;
-    }
+    if (!email.trim()) return setError("Please enter your email address");
+    if (!isValidEmail(email)) return setError("Please enter a valid email address");
+    if (!password) return setError("Please enter your password");
+    if (password.length < 6) return setError("Password must be at least 6 characters");
 
     setLoading(true);
-    
     try {
       const { data, error: authError } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password,
       });
-      
       if (authError) throw authError;
-      
-      // Success - Check user role and navigate accordingly
-      console.log("Login successful!", data);
-      
+
       const userRole = data.user?.user_metadata?.role;
-      
-      if (userRole === "recruiter") {
-        navigate("/recruiter-dashboard");
-      } else {
-        // Default to candidate dashboard
-        navigate("/dashboard");
-      }
-      
+      navigate(userRole === "recruiter" ? "/recruiter-dashboard" : "/dashboard");
     } catch (err) {
-      console.error("Login error:", err);
-      
-      // User-friendly error messages
       if (err.message.includes("Invalid login credentials")) {
         setError("Invalid email or password. Please try again.");
       } else if (err.message.includes("Email not confirmed")) {
         setError("Please confirm your email address before logging in.");
       } else {
-        setError(err.message || "An error occurred during login. Please try again.");
+        setError(err.message || "An error occurred. Please try again.");
       }
     } finally {
       setLoading(false);
@@ -81,76 +52,89 @@ export default function Login() {
   };
 
   return (
-    <div className="auth-wrapper">
-      {/* Left Side - Branding */}
+    <div className={`auth-wrapper ${mounted ? "mounted" : ""}`}>
+
+      {/* Animated Background */}
+      <div className="bg-canvas">
+        <div className="orb orb-1" />
+        <div className="orb orb-2" />
+        <div className="orb orb-3" />
+        <div className="grid-lines" />
+        <div className="noise-overlay" />
+      </div>
+
+      {/* Left Branding */}
       <div className="auth-branding">
         <div className="branding-content">
+
           <Link to="/" className="brand-logo" aria-label="PrepMate AI Home">
             <div className="brand-icon">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="brand-svg" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
               </svg>
             </div>
-            <div>
+            <div className="brand-text">
               <span className="brand-name">PrepMate</span>
               <span className="brand-ai">AI</span>
             </div>
           </Link>
 
+          <div className="live-badge">
+            <span className="badge-pulse" />
+            <span>50,000+ active users</span>
+          </div>
+
           <h1 className="branding-title">
-            Welcome Back to PrepMate AI
+            <span className="title-reveal" style={{ animationDelay: "0.2s" }}>Welcome</span>
+            <span className="title-reveal title-accent" style={{ animationDelay: "0.35s" }}>Back.</span>
           </h1>
-          <p className="branding-subtitle">
-            Continue mastering your interview skills with AI-powered coaching
+
+          <p className="branding-subtitle title-reveal" style={{ animationDelay: "0.5s" }}>
+            Continue mastering your interview skills with AI-powered coaching built for success.
           </p>
 
           <div className="stats-showcase">
-            <div className="stat-card">
-              <div className="stat-value">98%</div>
-              <div className="stat-label">Success Rate</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-value">50K+</div>
-              <div className="stat-label">Active Users</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-value">10K+</div>
-              <div className="stat-label">Questions</div>
+            {[
+              { value: "98%", label: "Success Rate", icon: "📈" },
+              { value: "50K+", label: "Active Users", icon: "👥" },
+              { value: "10K+", label: "Questions", icon: "💡" },
+            ].map((stat, i) => (
+              <div className="stat-card" key={i} style={{ animationDelay: `${0.6 + i * 0.12}s` }}>
+                <div className="stat-emoji">{stat.icon}</div>
+                <div className="stat-value">{stat.value}</div>
+                <div className="stat-label">{stat.label}</div>
+              </div>
+            ))}
+          </div>
+
+          <div className="testimonial-mini title-reveal" style={{ animationDelay: "0.9s" }}>
+            <div className="testimonial-stars">★★★★★</div>
+            <p className="testimonial-quote">
+              "PrepMate AI transformed how I prepare for interviews. I felt confident and ready for every question."
+            </p>
+            <div className="testimonial-author">
+              <div className="author-avatar">SK</div>
+              <div>
+                <div className="author-name">Sarah Kim</div>
+                <div className="author-role">Software Engineer @ Meta</div>
+              </div>
             </div>
           </div>
 
-          <div className="branding-image" aria-hidden="true">
-            <svg viewBox="0 0 400 300" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <rect width="400" height="300" rx="20" fill="url(#paint0_linear)"/>
-              <circle cx="100" cy="100" r="40" fill="rgba(255,255,255,0.1)"/>
-              <circle cx="300" cy="200" r="60" fill="rgba(255,255,255,0.08)"/>
-              <rect x="80" y="120" width="240" height="120" rx="12" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.2)" strokeWidth="2"/>
-              <line x1="100" y1="150" x2="280" y2="150" stroke="rgba(255,255,255,0.3)" strokeWidth="4" strokeLinecap="round"/>
-              <line x1="100" y1="180" x2="240" y2="180" stroke="rgba(255,255,255,0.3)" strokeWidth="4" strokeLinecap="round"/>
-              <line x1="100" y1="210" x2="260" y2="210" stroke="rgba(255,255,255,0.3)" strokeWidth="4" strokeLinecap="round"/>
-              <circle cx="340" cy="40" r="8" fill="#667eea"/>
-              <circle cx="360" cy="60" r="6" fill="#764ba2"/>
-              <defs>
-                <linearGradient id="paint0_linear" x1="0" y1="0" x2="400" y2="300" gradientUnits="userSpaceOnUse">
-                  <stop stopColor="#667eea" stopOpacity="0.2"/>
-                  <stop offset="1" stopColor="#764ba2" stopOpacity="0.1"/>
-                </linearGradient>
-              </defs>
-            </svg>
-          </div>
         </div>
       </div>
 
-      {/* Right Side - Form */}
+      {/* Right Form */}
       <div className="auth-form-container">
         <div className="auth-form">
+
           <div className="form-header">
-            <h2>Sign In to Your Account</h2>
+            <h2>Sign In</h2>
             <p>Enter your credentials to continue your preparation</p>
           </div>
 
           <form className="form-body" onSubmit={handleLogin} noValidate>
-            {/* Error Message Display */}
+
             {error && (
               <div className="error-message" role="alert">
                 <svg className="error-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
@@ -162,20 +146,23 @@ export default function Login() {
 
             <div className="input-group">
               <label htmlFor="email">Email Address</label>
-              <input
-                id="email"
-                type="email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => {
-                  setEmail(e.target.value);
-                  setError(""); // Clear error on input
-                }}
-                disabled={loading}
-                autoComplete="email"
-                aria-required="true"
-                aria-invalid={error && !isValidEmail(email) ? "true" : "false"}
-              />
+              <div className="input-wrapper">
+                <span className="input-icon">
+                  <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                </span>
+                <input
+                  id="email"
+                  type="email"
+                  placeholder="you@example.com"
+                  value={email}
+                  onChange={(e) => { setEmail(e.target.value); setError(""); }}
+                  disabled={loading}
+                  autoComplete="email"
+                  aria-required="true"
+                />
+              </div>
             </div>
 
             <div className="input-group">
@@ -183,23 +170,43 @@ export default function Login() {
                 <label htmlFor="password">Password</label>
                 <a href="#" className="forgot-link">Forgot password?</a>
               </div>
-              <input
-                id="password"
-                type="password"
-                placeholder="Enter your password"
-                value={password}
-                onChange={(e) => {
-                  setPassword(e.target.value);
-                  setError(""); // Clear error on input
-                }}
-                disabled={loading}
-                autoComplete="current-password"
-                aria-required="true"
-                aria-invalid={error && password.length < 6 ? "true" : "false"}
-              />
+              <div className="input-wrapper">
+                <span className="input-icon">
+                  <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                </span>
+                <input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={(e) => { setPassword(e.target.value); setError(""); }}
+                  disabled={loading}
+                  autoComplete="current-password"
+                  aria-required="true"
+                />
+                <button
+                  type="button"
+                  className="password-toggle"
+                  onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? (
+                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                    </svg>
+                  ) : (
+                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </svg>
+                  )}
+                </button>
+              </div>
             </div>
 
-            <button 
+            <button
               type="submit"
               disabled={loading}
               className="submit-button"
@@ -217,15 +224,13 @@ export default function Login() {
                 <>
                   Sign In
                   <svg className="btn-arrow" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                   </svg>
                 </>
               )}
             </button>
 
-            <div className="form-divider">
-              <span>or continue with</span>
-            </div>
+            <div className="form-divider"><span>or continue with</span></div>
 
             <div className="social-buttons">
               <button type="button" className="social-button" aria-label="Sign in with Google">
@@ -247,17 +252,13 @@ export default function Login() {
 
             <p className="form-footer">
               Don't have an account?{" "}
-              <Link to="/signup" className="footer-link">
-                Start free trial
-              </Link>
+              <Link to="/signup" className="footer-link">Start free trial</Link>
             </p>
+
           </form>
         </div>
       </div>
 
-      {/* Background Elements */}
-      <div className="bg-gradient gradient-1" aria-hidden="true"></div>
-      <div className="bg-gradient gradient-2" aria-hidden="true"></div>
     </div>
   );
 }

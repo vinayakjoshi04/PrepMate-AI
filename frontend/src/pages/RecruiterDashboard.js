@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "../supabaseClient";
 import { useNavigate } from "react-router-dom";
 import "./RecruiterDashboard.css";
@@ -23,52 +23,43 @@ const Icon = {
   Tag: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>,
   Send: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>,
   Filter: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>,
-  Trash: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d1="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>,
+  Trash: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>,
   Globe: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>,
   MapPin: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>,
   Award: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/></svg>,
   Zap: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>,
-  ChevronDown: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>,
   Bell: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>,
-  Image: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>,
-  Link: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>,
+  Download: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>,
+  FileText: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>,
+  RefreshCw: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>,
 };
 
-/* ─── Mock Data ──────────────────────────────────────── */
-const MOCK_CANDIDATES = [
-  { id: 1, name: "Arjun Mehta", email: "arjun@example.com", role: "Frontend Developer", college: "IIT Bombay", skills: ["React", "TypeScript", "Node.js"], score: 9.2, status: "available", location: "Mumbai", experience: "Fresher", avatar: "A", matchPct: 94 },
-  { id: 2, name: "Priya Sharma", email: "priya@example.com", role: "Data Scientist", college: "NIT Trichy", skills: ["Python", "ML", "TensorFlow"], score: 8.7, status: "open", location: "Bengaluru", experience: "1 yr", avatar: "P", matchPct: 88 },
-  { id: 3, name: "Rohan Das", email: "rohan@example.com", role: "Backend Engineer", college: "BITS Pilani", skills: ["Java", "Spring Boot", "AWS"], score: 8.1, status: "available", location: "Hyderabad", experience: "Fresher", avatar: "R", matchPct: 82 },
-  { id: 4, name: "Sneha Iyer", email: "sneha@example.com", role: "Product Designer", college: "IIT Delhi", skills: ["Figma", "UX Research", "Prototyping"], score: 9.5, status: "open", location: "Pune", experience: "Intern", avatar: "S", matchPct: 91 },
-  { id: 5, name: "Vikram Nair", email: "vikram@example.com", role: "DevOps Engineer", college: "VIT Vellore", skills: ["Docker", "Kubernetes", "CI/CD"], score: 7.9, status: "available", location: "Chennai", experience: "Fresher", avatar: "V", matchPct: 76 },
-  { id: 6, name: "Ananya Bose", email: "ananya@example.com", role: "Full Stack Developer", college: "IIIT Hyderabad", skills: ["React", "Django", "PostgreSQL"], score: 8.4, status: "open", location: "Bengaluru", experience: "1 yr", avatar: "A", matchPct: 85 },
-];
+/* ─── Helpers ────────────────────────────────────────── */
+function avatarColor(letter) {
+  const map = { A: "#667eea, #764ba2", P: "#f093fb, #f5576c", R: "#4facfe, #00f2fe", S: "#43e97b, #38f9d7", V: "#fa709a, #fee140", B: "#a18cd1, #fbc2eb", D: "#f7971e, #ffd200", K: "#11998e, #38ef7d", M: "#834d9b, #d04ed6", N: "#1a1a2e, #16213e" };
+  return map[letter?.toUpperCase()] || "#667eea, #764ba2";
+}
 
-const MOCK_INTERVIEWS = [
-  { id: 1, candidateName: "Arjun Mehta", position: "Senior Frontend Engineer", date: "2024-03-20", score: 9.2, status: "Completed", avatar: "A" },
-  { id: 2, candidateName: "Priya Sharma", position: "Data Scientist", date: "2024-03-19", score: 8.7, status: "Completed", avatar: "P" },
-  { id: 3, candidateName: "Rohan Das", position: "Backend Engineer", date: "2024-03-21", score: null, status: "Scheduled", avatar: "R" },
-  { id: 4, candidateName: "Sneha Iyer", position: "Product Designer", date: "2024-03-18", score: 9.5, status: "Completed", avatar: "S" },
-  { id: 5, candidateName: "Vikram Nair", position: "DevOps Engineer", date: "2024-03-22", score: null, status: "In Progress", avatar: "V" },
-];
+function getInitial(name) {
+  return name ? name.charAt(0).toUpperCase() : "?";
+}
 
-const MOCK_POSTS = [
-  { id: 1, title: "Software Engineer — Full Stack", type: "Full-time", location: "Bengaluru / Remote", salary: "₹12–20 LPA", deadline: "2024-04-15", description: "We're looking for a passionate full-stack engineer to join our growing product team. You'll be building features used by millions.", tags: ["React", "Node.js", "PostgreSQL"], applicants: 37, posted: "2 days ago", active: true },
-  { id: 2, title: "Product Design Intern", type: "Internship", location: "Mumbai", salary: "₹25k/month", deadline: "2024-04-01", description: "Join our design team for a 3-month internship. Work on real product challenges and ship features you can be proud of.", tags: ["Figma", "UX", "Prototyping"], applicants: 52, posted: "5 days ago", active: true },
-];
+function StatusBadge({ status }) {
+  const cls = { Completed: "rd-badge-green", "In Progress": "rd-badge-amber", Scheduled: "rd-badge-purple", pending: "rd-badge-amber", accepted: "rd-badge-green", declined: "rd-badge-dim" };
+  return <span className={`rd-badge ${cls[status] || "rd-badge-dim"}`}>{status}</span>;
+}
 
-/* ─── Post Modal Component ───────────────────────────── */
-function PostModal({ onClose, onSubmit, editPost }) {
+/* ─── Post Modal ─────────────────────────────────────── */
+function PostModal({ onClose, onSubmit, editPost, saving }) {
   const [form, setForm] = useState(editPost || {
     title: "", type: "Full-time", location: "", salary: "", deadline: "",
-    description: "", tags: "", requirements: "", perks: "",
+    description: "", requirements: "", perks: "",
   });
   const [tagInput, setTagInput] = useState(editPost?.tags?.join(", ") || "");
 
   const handleSubmit = () => {
     if (!form.title || !form.description || !form.location) return;
     onSubmit({ ...form, tags: tagInput.split(",").map(t => t.trim()).filter(Boolean) });
-    onClose();
   };
 
   return (
@@ -81,66 +72,52 @@ function PostModal({ onClose, onSubmit, editPost }) {
           </div>
           <button className="rd-modal-close" onClick={onClose}><Icon.X /></button>
         </div>
-
         <div className="rd-modal-body">
           <div className="rd-field-grid">
             <div className="rd-field rd-field-full">
               <label>Job Title *</label>
               <input placeholder="e.g. Senior Software Engineer" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} />
             </div>
-
             <div className="rd-field">
               <label>Employment Type</label>
               <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))}>
-                <option>Full-time</option>
-                <option>Part-time</option>
-                <option>Internship</option>
-                <option>Contract</option>
-                <option>Freelance</option>
+                <option>Full-time</option><option>Part-time</option><option>Internship</option><option>Contract</option><option>Freelance</option>
               </select>
             </div>
-
             <div className="rd-field">
               <label>Location *</label>
               <input placeholder="e.g. Bengaluru / Remote" value={form.location} onChange={e => setForm(f => ({ ...f, location: e.target.value }))} />
             </div>
-
             <div className="rd-field">
               <label>Salary / Stipend</label>
               <input placeholder="e.g. ₹12–20 LPA or ₹25k/month" value={form.salary} onChange={e => setForm(f => ({ ...f, salary: e.target.value }))} />
             </div>
-
             <div className="rd-field">
               <label>Application Deadline</label>
               <input type="date" value={form.deadline} onChange={e => setForm(f => ({ ...f, deadline: e.target.value }))} />
             </div>
-
             <div className="rd-field rd-field-full">
               <label>Job Description *</label>
               <textarea rows={4} placeholder="Describe the role, responsibilities, and what makes this opportunity exciting..." value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
             </div>
-
             <div className="rd-field rd-field-full">
               <label>Requirements</label>
               <textarea rows={3} placeholder="List key qualifications, skills, and experience required..." value={form.requirements} onChange={e => setForm(f => ({ ...f, requirements: e.target.value }))} />
             </div>
-
             <div className="rd-field rd-field-full">
               <label>Perks & Benefits</label>
               <textarea rows={2} placeholder="Health insurance, remote work, learning budget, stock options..." value={form.perks} onChange={e => setForm(f => ({ ...f, perks: e.target.value }))} />
             </div>
-
             <div className="rd-field rd-field-full">
               <label>Skill Tags <span className="rd-label-hint">(comma-separated)</span></label>
               <input placeholder="React, Node.js, AWS, Python..." value={tagInput} onChange={e => setTagInput(e.target.value)} />
             </div>
           </div>
         </div>
-
         <div className="rd-modal-footer">
-          <button className="rd-btn-ghost" onClick={onClose}>Cancel</button>
-          <button className="rd-btn-primary" onClick={handleSubmit}>
-            <Icon.Send />
+          <button className="rd-btn-ghost" onClick={onClose} disabled={saving}>Cancel</button>
+          <button className="rd-btn-primary" onClick={handleSubmit} disabled={saving}>
+            {saving ? <span className="rd-btn-spinner" /> : <Icon.Send />}
             {editPost ? "Update Post" : "Publish Post"}
           </button>
         </div>
@@ -149,9 +126,60 @@ function PostModal({ onClose, onSubmit, editPost }) {
   );
 }
 
-/* ─── Candidate Profile Drawer ───────────────────────── */
-function CandidateDrawer({ candidate, onClose, onInvite }) {
+/* ─── Invite Modal ───────────────────────────────────── */
+function InviteModal({ candidate, posts, onClose, onSend }) {
+  const [selectedPost, setSelectedPost] = useState(posts[0]?.id || "");
+  const [message, setMessage] = useState(`Hi ${candidate?.candidate_name || candidate?.name},\n\nWe reviewed your profile on PrepMate and are impressed by your background. We'd love to invite you for an interview for one of our open positions.\n\nLooking forward to connecting!\n\nBest regards`);
+  const [sending, setSending] = useState(false);
+
+  const handleSend = async () => {
+    setSending(true);
+    await onSend({ candidateId: candidate.candidate_id || candidate.id, postId: selectedPost, message });
+    setSending(false);
+    onClose();
+  };
+
+  return (
+    <div className="rd-modal-overlay" onClick={onClose}>
+      <div className="rd-modal" style={{ maxWidth: 540 }} onClick={e => e.stopPropagation()}>
+        <div className="rd-modal-header">
+          <div>
+            <h2 className="rd-modal-title">Invite to Interview</h2>
+            <p className="rd-modal-sub">Send an invite to {candidate?.candidate_name || candidate?.name}</p>
+          </div>
+          <button className="rd-modal-close" onClick={onClose}><Icon.X /></button>
+        </div>
+        <div className="rd-modal-body">
+          <div className="rd-field" style={{ marginBottom: 16 }}>
+            <label>Select Job Position</label>
+            <select value={selectedPost} onChange={e => setSelectedPost(e.target.value)}>
+              <option value="">— No specific post —</option>
+              {posts.map(p => <option key={p.id} value={p.id}>{p.title}</option>)}
+            </select>
+          </div>
+          <div className="rd-field">
+            <label>Message</label>
+            <textarea rows={7} value={message} onChange={e => setMessage(e.target.value)} />
+          </div>
+        </div>
+        <div className="rd-modal-footer">
+          <button className="rd-btn-ghost" onClick={onClose}>Cancel</button>
+          <button className="rd-btn-primary" onClick={handleSend} disabled={sending}>
+            {sending ? <span className="rd-btn-spinner" /> : <Icon.Send />}
+            Send Invite
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Candidate / Resume Drawer ──────────────────────── */
+function CandidateDrawer({ candidate, onClose, onInvite, resumeUrl }) {
   if (!candidate) return null;
+  const name = candidate.candidate_name || candidate.name || "Unknown";
+  const initial = getInitial(name);
+
   return (
     <div className="rd-drawer-overlay" onClick={onClose}>
       <div className="rd-drawer" onClick={e => e.stopPropagation()}>
@@ -160,51 +188,72 @@ function CandidateDrawer({ candidate, onClose, onInvite }) {
         </div>
         <div className="rd-drawer-body">
           <div className="rd-profile-hero">
-            <div className="rd-profile-avatar" style={{ background: `linear-gradient(135deg, ${avatarColor(candidate.avatar)})` }}>
-              {candidate.avatar}
+            <div className="rd-profile-avatar" style={{ background: `linear-gradient(135deg, ${avatarColor(initial)})` }}>
+              {initial}
             </div>
             <div>
-              <h2 className="rd-profile-name">{candidate.name}</h2>
-              <p className="rd-profile-role">{candidate.role}</p>
-              <p className="rd-profile-college">{candidate.college}</p>
+              <h2 className="rd-profile-name">{name}</h2>
+              <p className="rd-profile-role">{candidate.role || "Candidate"}</p>
+              <p className="rd-profile-college">{candidate.college || candidate.candidate_email || ""}</p>
             </div>
-            <div className="rd-match-ring">
-              <span className="rd-match-pct">{candidate.matchPct}%</span>
-              <span className="rd-match-label">match</span>
-            </div>
+            {candidate.ats_score && (
+              <div className="rd-match-ring">
+                <span className="rd-match-pct">{candidate.ats_score}</span>
+                <span className="rd-match-label">ATS score</span>
+              </div>
+            )}
           </div>
 
           <div className="rd-profile-meta">
-            <span className="rd-meta-chip"><Icon.MapPin />{candidate.location}</span>
-            <span className="rd-meta-chip"><Icon.Calendar />{candidate.experience}</span>
-            <span className="rd-meta-chip rd-chip-score"><Icon.Star />{candidate.score}/10</span>
+            {candidate.location && <span className="rd-meta-chip"><Icon.MapPin />{candidate.location}</span>}
+            {candidate.experience && <span className="rd-meta-chip"><Icon.Calendar />{candidate.experience}</span>}
+            {candidate.ats_score && <span className="rd-meta-chip rd-chip-score"><Icon.Star />{candidate.ats_score}/10</span>}
           </div>
 
-          <div className="rd-section-block">
-            <h3 className="rd-block-title">Skills</h3>
-            <div className="rd-skills-wrap">
-              {candidate.skills.map((s, i) => <span key={i} className="rd-skill-tag">{s}</span>)}
-            </div>
-          </div>
-
-          <div className="rd-section-block">
-            <h3 className="rd-block-title">Interview Performance</h3>
-            <div className="rd-score-bar-wrap">
-              <div className="rd-score-bar">
-                <div className="rd-score-fill" style={{ width: `${candidate.score * 10}%` }} />
+          {candidate.skills?.length > 0 && (
+            <div className="rd-section-block">
+              <h3 className="rd-block-title">Skills</h3>
+              <div className="rd-skills-wrap">
+                {candidate.skills.map((s, i) => <span key={i} className="rd-skill-tag">{s}</span>)}
               </div>
-              <span className="rd-score-num">{candidate.score}/10</span>
             </div>
-          </div>
+          )}
+
+          {candidate.ats_score && (
+            <div className="rd-section-block">
+              <h3 className="rd-block-title">ATS Score</h3>
+              <div className="rd-score-bar-wrap">
+                <div className="rd-score-bar">
+                  <div className="rd-score-fill" style={{ width: `${candidate.ats_score * 10}%` }} />
+                </div>
+                <span className="rd-score-num">{candidate.ats_score}/10</span>
+              </div>
+            </div>
+          )}
 
           <div className="rd-section-block">
             <h3 className="rd-block-title">Contact</h3>
-            <p className="rd-contact-email"><Icon.Mail /> {candidate.email}</p>
+            <p className="rd-contact-email"><Icon.Mail /> {candidate.candidate_email || "—"}</p>
           </div>
+
+          {candidate.resume_url && (
+            <div className="rd-section-block">
+              <h3 className="rd-block-title">Resume</h3>
+              <a
+                href={resumeUrl || "#"}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rd-resume-download-btn"
+              >
+                <Icon.Download /> Download Resume
+                {candidate.resume_filename && <span className="rd-resume-fname">{candidate.resume_filename}</span>}
+              </a>
+            </div>
+          )}
 
           <div className="rd-drawer-actions">
             <button className="rd-btn-ghost rd-btn-full" onClick={onClose}>Close</button>
-            <button className="rd-btn-primary rd-btn-full" onClick={() => { onInvite(candidate); onClose(); }}>
+            <button className="rd-btn-primary rd-btn-full" onClick={() => onInvite(candidate)}>
               <Icon.Send /> Invite to Interview
             </button>
           </div>
@@ -214,26 +263,15 @@ function CandidateDrawer({ candidate, onClose, onInvite }) {
   );
 }
 
-/* ─── Invite Toast ───────────────────────────────────── */
-function Toast({ msg, onClose }) {
+/* ─── Toast ──────────────────────────────────────────── */
+function Toast({ msg, type = "success", onClose }) {
   useEffect(() => { const t = setTimeout(onClose, 3500); return () => clearTimeout(t); }, [onClose]);
   return (
-    <div className="rd-toast">
-      <span className="rd-toast-icon"><Icon.Check /></span>
+    <div className={`rd-toast ${type === "error" ? "rd-toast-error" : ""}`}>
+      <span className="rd-toast-icon">{type === "error" ? <Icon.X /> : <Icon.Check />}</span>
       {msg}
     </div>
   );
-}
-
-/* ─── Helpers ────────────────────────────────────────── */
-function avatarColor(letter) {
-  const map = { A: "#667eea, #764ba2", P: "#f093fb, #f5576c", R: "#4facfe, #00f2fe", S: "#43e97b, #38f9d7", V: "#fa709a, #fee140", B: "#a18cd1, #fbc2eb" };
-  return map[letter] || "#667eea, #764ba2";
-}
-
-function StatusBadge({ status }) {
-  const cls = { Completed: "rd-badge-green", "In Progress": "rd-badge-amber", Scheduled: "rd-badge-purple", Pending: "rd-badge-dim" };
-  return <span className={`rd-badge ${cls[status] || "rd-badge-dim"}`}>{status}</span>;
 }
 
 /* ─── Main Dashboard ─────────────────────────────────── */
@@ -244,33 +282,26 @@ export default function RecruiterDashboard() {
   const [activeTab, setActiveTab] = useState("overview");
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // Posts
-  const [posts, setPosts] = useState(MOCK_POSTS);
+  // DB state
+  const [posts, setPosts] = useState([]);
+  const [postsLoading, setPostsLoading] = useState(false);
+  const [candidates, setCandidates] = useState([]);  // from resumes table
+  const [candidatesLoading, setCandidatesLoading] = useState(false);
+  const [invites, setInvites] = useState([]);
+
+  // UI state
   const [showPostModal, setShowPostModal] = useState(false);
   const [editingPost, setEditingPost] = useState(null);
-
-  // Candidates
-  const [candidates] = useState(MOCK_CANDIDATES);
+  const [savingPost, setSavingPost] = useState(false);
   const [candidateSearch, setCandidateSearch] = useState("");
   const [candidateFilter, setCandidateFilter] = useState("all");
   const [selectedCandidate, setSelectedCandidate] = useState(null);
-
-  // Interviews
-  const [interviews] = useState(MOCK_INTERVIEWS);
-
-  // Toast
+  const [resumeSignedUrl, setResumeSignedUrl] = useState(null);
+  const [inviteTarget, setInviteTarget] = useState(null);
   const [toast, setToast] = useState(null);
 
-  const stats = {
-    totalInterviews: interviews.length,
-    activePositions: posts.filter(p => p.active).length,
-    candidatesReviewed: candidates.length,
-    avgScore: (candidates.reduce((s, c) => s + c.score, 0) / candidates.length).toFixed(1),
-  };
-
-  useEffect(() => {
-    checkUser();
-  }, []);
+  /* ─── Auth check ─── */
+  useEffect(() => { checkUser(); }, []);
 
   const checkUser = async () => {
     try {
@@ -278,6 +309,9 @@ export default function RecruiterDashboard() {
       if (!user) { navigate("/login"); return; }
       if (user.user_metadata?.role !== "recruiter") { navigate("/dashboard"); return; }
       setUser(user);
+      fetchPosts(user.id);
+      fetchCandidates();
+      fetchInvites(user.id);
     } catch {
       navigate("/login");
     } finally {
@@ -285,49 +319,151 @@ export default function RecruiterDashboard() {
     }
   };
 
+  /* ─── Fetch Job Posts ─── */
+  const fetchPosts = useCallback(async (uid) => {
+    setPostsLoading(true);
+    const { data, error } = await supabase
+      .from("job_posts")
+      .select("*")
+      .eq("recruiter_id", uid)
+      .order("created_at", { ascending: false });
+    if (!error && data) setPosts(data);
+    setPostsLoading(false);
+  }, []);
+
+  /* ─── Fetch Candidates (resumes table) ─── */
+  const fetchCandidates = useCallback(async () => {
+    setCandidatesLoading(true);
+    const { data, error } = await supabase
+      .from("resumes")
+      .select("*")
+      .eq("visible_to_recruiters", true)
+      .order("created_at", { ascending: false });
+    if (!error && data) setCandidates(data);
+    setCandidatesLoading(false);
+  }, []);
+
+  /* ─── Fetch Invites sent by this recruiter ─── */
+  const fetchInvites = useCallback(async (uid) => {
+    const { data } = await supabase
+      .from("interview_invites")
+      .select("*, job_posts(title)")
+      .eq("recruiter_id", uid)
+      .order("created_at", { ascending: false });
+    if (data) setInvites(data);
+  }, []);
+
+  /* ─── Signed URL for resume download ─── */
+  const openCandidateDrawer = async (c) => {
+    setSelectedCandidate(c);
+    setResumeSignedUrl(null);
+    if (c.resume_url) {
+      const { data } = await supabase.storage
+        .from("resumes")
+        .createSignedUrl(c.resume_url, 3600);
+      if (data?.signedUrl) setResumeSignedUrl(data.signedUrl);
+    }
+  };
+
+  /* ─── Publish / Update Post ─── */
+  const handlePublishPost = async (form) => {
+    setSavingPost(true);
+    if (editingPost) {
+      const { error } = await supabase
+        .from("job_posts")
+        .update({ ...form, updated_at: new Date().toISOString() })
+        .eq("id", editingPost.id)
+        .eq("recruiter_id", user.id);
+      if (!error) {
+        setPosts(prev => prev.map(p => p.id === editingPost.id ? { ...p, ...form } : p));
+        showToast("Job post updated successfully!");
+      } else showToast("Failed to update post.", "error");
+    } else {
+      const { data, error } = await supabase
+        .from("job_posts")
+        .insert({ ...form, recruiter_id: user.id, applicants: 0, active: true })
+        .select()
+        .single();
+      if (!error && data) {
+        setPosts(prev => [data, ...prev]);
+        showToast("Job post published! Students will see it now.");
+      } else showToast("Failed to publish post.", "error");
+    }
+    setSavingPost(false);
+    setShowPostModal(false);
+    setEditingPost(null);
+  };
+
+  /* ─── Delete Post ─── */
+  const handleDeletePost = async (id) => {
+    const { error } = await supabase.from("job_posts").delete().eq("id", id).eq("recruiter_id", user.id);
+    if (!error) {
+      setPosts(prev => prev.filter(p => p.id !== id));
+      showToast("Post removed.");
+    } else showToast("Failed to delete post.", "error");
+  };
+
+  /* ─── Toggle Post active/paused ─── */
+  const handleTogglePost = async (id, current) => {
+    const { error } = await supabase.from("job_posts").update({ active: !current }).eq("id", id).eq("recruiter_id", user.id);
+    if (!error) setPosts(prev => prev.map(p => p.id === id ? { ...p, active: !p.active } : p));
+  };
+
+  /* ─── Send Invite ─── */
+  const handleSendInvite = async ({ candidateId, postId, message }) => {
+    const { error } = await supabase.from("interview_invites").insert({
+      recruiter_id: user.id,
+      candidate_id: candidateId,
+      job_post_id: postId || null,
+      message,
+      status: "pending",
+    });
+    if (!error) {
+      showToast(`Invitation sent to ${selectedCandidate?.candidate_name || inviteTarget?.candidate_name}!`);
+      fetchInvites(user.id);
+    } else showToast("Failed to send invite.", "error");
+    setInviteTarget(null);
+  };
+
+  /* ─── Logout ─── */
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate("/login");
   };
 
-  const handlePublishPost = (post) => {
-    if (editingPost) {
-      setPosts(prev => prev.map(p => p.id === editingPost.id ? { ...p, ...post } : p));
-      setToast("Job post updated successfully!");
-    } else {
-      setPosts(prev => [{ ...post, id: Date.now(), applicants: 0, posted: "Just now", active: true }, ...prev]);
-      setToast("Job post published! Students will see it now.");
-    }
-    setEditingPost(null);
-  };
+  const showToast = (msg, type = "success") => setToast({ msg, type });
 
-  const handleDeletePost = (id) => {
-    setPosts(prev => prev.filter(p => p.id !== id));
-    setToast("Post removed.");
-  };
-
-  const handleTogglePost = (id) => {
-    setPosts(prev => prev.map(p => p.id === id ? { ...p, active: !p.active } : p));
-  };
-
-  const handleInvite = (candidate) => {
-    setToast(`Invitation sent to ${candidate.name}!`);
-  };
-
+  /* ─── Filtered candidates ─── */
   const filteredCandidates = candidates.filter(c => {
     const q = candidateSearch.toLowerCase();
-    const matchesSearch = c.name.toLowerCase().includes(q) || c.role.toLowerCase().includes(q) || c.skills.some(s => s.toLowerCase().includes(q));
-    const matchesFilter = candidateFilter === "all" || c.status === candidateFilter || c.experience.toLowerCase().includes(candidateFilter);
+    const name = (c.candidate_name || "").toLowerCase();
+    const role = (c.role || "").toLowerCase();
+    const skills = (c.skills || []).map(s => s.toLowerCase());
+    const matchesSearch = !q || name.includes(q) || role.includes(q) || skills.some(s => s.includes(q));
+    const matchesFilter =
+      candidateFilter === "all" ||
+      (c.experience || "").toLowerCase().includes(candidateFilter.toLowerCase()) ||
+      (c.role || "").toLowerCase().includes(candidateFilter.toLowerCase());
     return matchesSearch && matchesFilter;
   });
 
+  /* ─── Stats ─── */
+  const stats = {
+    totalInvites: invites.length,
+    activePositions: posts.filter(p => p.active).length,
+    candidatesPool: candidates.length,
+    avgAts: candidates.length
+      ? (candidates.reduce((s, c) => s + (c.ats_score || 0), 0) / candidates.filter(c => c.ats_score).length || 0).toFixed(1)
+      : "—",
+  };
+
   const NAV = [
-    { id: "overview", label: "Overview", icon: Icon.Home },
-    { id: "posts", label: "Job Posts", icon: Icon.Edit },
-    { id: "candidates", label: "Candidates", icon: Icon.Users },
-    { id: "interviews", label: "Interviews", icon: Icon.Calendar },
-    { id: "analytics", label: "Analytics", icon: Icon.BarChart },
-    { id: "settings", label: "Settings", icon: Icon.Settings },
+    { id: "overview",    label: "Overview",    icon: Icon.Home },
+    { id: "posts",       label: "Job Posts",   icon: Icon.Edit },
+    { id: "candidates",  label: "Candidates",  icon: Icon.Users },
+    { id: "invites",     label: "Invites",     icon: Icon.Mail },
+    { id: "analytics",   label: "Analytics",   icon: Icon.BarChart },
+    { id: "settings",    label: "Settings",    icon: Icon.Settings },
   ];
 
   if (loading) return (
@@ -339,39 +475,32 @@ export default function RecruiterDashboard() {
 
   return (
     <div className={`rd-root ${sidebarOpen ? "sidebar-open" : ""}`}>
-      {/* Background ambient blobs */}
       <div className="rd-ambient rd-amb-1" />
       <div className="rd-ambient rd-amb-2" />
 
-      {/* ── Sidebar ──────────────────────────────────── */}
+      {/* ── Sidebar ── */}
       <aside className="rd-sidebar">
         <div className="rd-sidebar-top">
           <div className="rd-brand">
-            <div className="rd-brand-icon">
-              <Icon.Zap />
-            </div>
+            <div className="rd-brand-icon"><Icon.Zap /></div>
             <div className="rd-brand-text">
               <span className="rd-brand-name">PrepMate</span>
               <span className="rd-brand-badge">Recruiter</span>
             </div>
           </div>
-
           <nav className="rd-nav">
             {NAV.map(({ id, label, icon: Ic }) => (
-              <button
-                key={id}
-                className={`rd-nav-item ${activeTab === id ? "active" : ""}`}
-                onClick={() => { setActiveTab(id); setSidebarOpen(false); }}
-              >
+              <button key={id} className={`rd-nav-item ${activeTab === id ? "active" : ""}`}
+                onClick={() => { setActiveTab(id); setSidebarOpen(false); }}>
                 <span className="rd-nav-icon"><Ic /></span>
                 <span>{label}</span>
-                {id === "posts" && <span className="rd-nav-badge">{posts.length}</span>}
-                {id === "candidates" && <span className="rd-nav-badge">{candidates.length}</span>}
+                {id === "posts" && posts.length > 0 && <span className="rd-nav-badge">{posts.length}</span>}
+                {id === "candidates" && candidates.length > 0 && <span className="rd-nav-badge">{candidates.length}</span>}
+                {id === "invites" && invites.length > 0 && <span className="rd-nav-badge">{invites.length}</span>}
               </button>
             ))}
           </nav>
         </div>
-
         <div className="rd-sidebar-bottom">
           <div className="rd-user-card">
             <div className="rd-user-av">{user?.email?.charAt(0).toUpperCase()}</div>
@@ -380,19 +509,14 @@ export default function RecruiterDashboard() {
               <div className="rd-user-role">Recruiter</div>
             </div>
           </div>
-          <button className="rd-logout-btn" onClick={handleLogout}>
-            <Icon.LogOut /> Sign out
-          </button>
+          <button className="rd-logout-btn" onClick={handleLogout}><Icon.LogOut /> Sign out</button>
         </div>
       </aside>
 
-      {/* Mobile overlay */}
       {sidebarOpen && <div className="rd-sidebar-overlay" onClick={() => setSidebarOpen(false)} />}
 
-      {/* ── Main ─────────────────────────────────────── */}
+      {/* ── Main ── */}
       <main className="rd-main">
-
-        {/* Topbar */}
         <header className="rd-topbar">
           <button className="rd-hamburger" onClick={() => setSidebarOpen(o => !o)}>
             <span /><span /><span />
@@ -401,6 +525,9 @@ export default function RecruiterDashboard() {
             <h1>{NAV.find(n => n.id === activeTab)?.label}</h1>
           </div>
           <div className="rd-topbar-right">
+            <button className="rd-icon-action" onClick={() => { fetchCandidates(); fetchPosts(user.id); fetchInvites(user.id); }}>
+              <Icon.RefreshCw />
+            </button>
             <button className="rd-icon-action"><Icon.Bell /></button>
             {activeTab === "posts" && (
               <button className="rd-btn-primary rd-btn-sm" onClick={() => { setEditingPost(null); setShowPostModal(true); }}>
@@ -415,7 +542,6 @@ export default function RecruiterDashboard() {
           {/* ════ OVERVIEW ════ */}
           {activeTab === "overview" && (
             <div className="rd-tab-anim">
-              {/* Welcome */}
               <div className="rd-welcome">
                 <div>
                   <h2 className="rd-welcome-title">Good to see you, <span className="rd-highlight">{user?.email?.split("@")[0]}</span> 👋</h2>
@@ -426,13 +552,12 @@ export default function RecruiterDashboard() {
                 </button>
               </div>
 
-              {/* Stats */}
               <div className="rd-stats-grid">
                 {[
-                  { label: "Total Interviews", value: stats.totalInterviews, sub: "+5 this week", icon: Icon.Calendar, grad: "rd-grad-blue" },
-                  { label: "Active Positions", value: stats.activePositions, sub: `${posts.filter(p=>p.active).length} live posts`, icon: Icon.Briefcase, grad: "rd-grad-purple" },
-                  { label: "Candidates Pool", value: stats.candidatesReviewed, sub: "PrepMate students", icon: Icon.Users, grad: "rd-grad-green" },
-                  { label: "Avg. Score", value: `${stats.avgScore}/10`, sub: "+0.4 vs last month", icon: Icon.Award, grad: "rd-grad-pink" },
+                  { label: "Invites Sent",     value: stats.totalInvites,    sub: "to PrepMate candidates", icon: Icon.Mail,      grad: "rd-grad-blue"   },
+                  { label: "Active Positions", value: stats.activePositions, sub: `${posts.length} total posts`, icon: Icon.Briefcase, grad: "rd-grad-purple" },
+                  { label: "Candidate Pool",   value: stats.candidatesPool,  sub: "resumes visible",         icon: Icon.Users,     grad: "rd-grad-green"  },
+                  { label: "Avg ATS Score",    value: stats.avgAts !== "NaN" ? `${stats.avgAts}/10` : "—", sub: "across all candidates", icon: Icon.Award, grad: "rd-grad-pink" },
                 ].map(({ label, value, sub, icon: Ic, grad }, i) => (
                   <div className="rd-stat-card" key={i} style={{ "--i": i }}>
                     <div className={`rd-stat-icon-wrap ${grad}`}><Ic /></div>
@@ -445,47 +570,63 @@ export default function RecruiterDashboard() {
                 ))}
               </div>
 
-              {/* Quick: Recent Interviews */}
+              {/* Recent Candidates */}
               <div className="rd-card">
                 <div className="rd-card-header">
-                  <h3 className="rd-card-title">Recent Interviews</h3>
-                  <button className="rd-text-btn" onClick={() => setActiveTab("interviews")}>View all →</button>
+                  <h3 className="rd-card-title">Recent Candidates</h3>
+                  <button className="rd-text-btn" onClick={() => setActiveTab("candidates")}>View all →</button>
                 </div>
-                <div className="rd-table-wrap">
-                  <table className="rd-table">
-                    <thead><tr><th>Candidate</th><th>Position</th><th>Date</th><th>Score</th><th>Status</th></tr></thead>
-                    <tbody>
-                      {interviews.slice(0, 4).map(iv => (
-                        <tr key={iv.id}>
-                          <td>
-                            <div className="rd-cand-cell">
-                              <div className="rd-av rd-av-sm" style={{ background: `linear-gradient(135deg, ${avatarColor(iv.avatar)})` }}>{iv.avatar}</div>
-                              <span>{iv.candidateName}</span>
-                            </div>
-                          </td>
-                          <td className="rd-td-muted">{iv.position}</td>
-                          <td className="rd-td-muted">{new Date(iv.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}</td>
-                          <td>{iv.score ? <span className="rd-score-pill">{iv.score}</span> : <span className="rd-td-muted">—</span>}</td>
-                          <td><StatusBadge status={iv.status} /></td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                {candidatesLoading ? (
+                  <div className="rd-loading-inline"><div className="rd-loading-ring rd-ring-sm" /><span>Loading...</span></div>
+                ) : candidates.length === 0 ? (
+                  <p className="rd-empty-hint">No candidates have uploaded resumes yet.</p>
+                ) : (
+                  <div className="rd-table-wrap">
+                    <table className="rd-table">
+                      <thead><tr><th>Candidate</th><th>Role</th><th>College</th><th>ATS Score</th><th>Action</th></tr></thead>
+                      <tbody>
+                        {candidates.slice(0, 5).map(c => {
+                          const name = c.candidate_name || "—";
+                          const init = getInitial(name);
+                          return (
+                            <tr key={c.id}>
+                              <td>
+                                <div className="rd-cand-cell">
+                                  <div className="rd-av rd-av-sm" style={{ background: `linear-gradient(135deg, ${avatarColor(init)})` }}>{init}</div>
+                                  <span>{name}</span>
+                                </div>
+                              </td>
+                              <td className="rd-td-muted">{c.role || "—"}</td>
+                              <td className="rd-td-muted">{c.college || "—"}</td>
+                              <td>{c.ats_score ? <span className="rd-score-pill">{c.ats_score}</span> : <span className="rd-td-muted">—</span>}</td>
+                              <td>
+                                <button className="rd-action-btn" onClick={() => openCandidateDrawer(c)}><Icon.Eye /> View</button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
 
-              {/* Quick: Active Posts */}
+              {/* Your Job Posts */}
               <div className="rd-card">
                 <div className="rd-card-header">
                   <h3 className="rd-card-title">Your Job Posts</h3>
                   <button className="rd-text-btn" onClick={() => setActiveTab("posts")}>Manage →</button>
                 </div>
                 <div className="rd-posts-mini">
+                  {postsLoading && <div className="rd-loading-inline"><div className="rd-loading-ring rd-ring-sm" /></div>}
+                  {!postsLoading && posts.length === 0 && (
+                    <p className="rd-empty-hint">No posts yet. <button className="rd-inline-link" onClick={() => { setShowPostModal(true); setActiveTab("posts"); }}>Create your first post →</button></p>
+                  )}
                   {posts.slice(0, 3).map(post => (
                     <div key={post.id} className="rd-post-mini-card">
                       <div>
                         <div className="rd-post-mini-title">{post.title}</div>
-                        <div className="rd-post-mini-meta">{post.type} · {post.location} · {post.posted}</div>
+                        <div className="rd-post-mini-meta">{post.type} · {post.location} · {new Date(post.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}</div>
                       </div>
                       <div className="rd-post-mini-right">
                         <span className="rd-applicants-badge">{post.applicants} applicants</span>
@@ -493,7 +634,6 @@ export default function RecruiterDashboard() {
                       </div>
                     </div>
                   ))}
-                  {posts.length === 0 && <p className="rd-empty-hint">No posts yet. <button className="rd-inline-link" onClick={() => { setShowPostModal(true); setActiveTab("posts"); }}>Create your first post →</button></p>}
                 </div>
               </div>
             </div>
@@ -512,7 +652,9 @@ export default function RecruiterDashboard() {
                 </button>
               </div>
 
-              {posts.length === 0 ? (
+              {postsLoading ? (
+                <div className="rd-empty-state"><div className="rd-loading-ring" /></div>
+              ) : posts.length === 0 ? (
                 <div className="rd-empty-state">
                   <div className="rd-empty-icon"><Icon.Briefcase /></div>
                   <h3>No posts yet</h3>
@@ -546,12 +688,12 @@ export default function RecruiterDashboard() {
                             <span className="rd-appl-num">{post.applicants}</span>
                             <span className="rd-appl-lbl">applicants</span>
                           </div>
-                          <span className="rd-posted-time">{post.posted}</span>
+                          <span className="rd-posted-time">{new Date(post.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}</span>
                         </div>
                       </div>
                       <div className="rd-post-card-actions">
                         <button className="rd-action-btn" onClick={() => { setEditingPost(post); setShowPostModal(true); }}><Icon.Edit /> Edit</button>
-                        <button className="rd-action-btn" onClick={() => handleTogglePost(post.id)}>
+                        <button className="rd-action-btn" onClick={() => handleTogglePost(post.id, post.active)}>
                           {post.active ? <><Icon.Eye /> Pause</> : <><Icon.Globe /> Activate</>}
                         </button>
                         <button className="rd-action-btn rd-action-danger" onClick={() => handleDeletePost(post.id)}><Icon.Trash /> Delete</button>
@@ -569,24 +711,22 @@ export default function RecruiterDashboard() {
               <div className="rd-section-toolbar">
                 <div>
                   <h2 className="rd-section-heading">Candidate Pool</h2>
-                  <p className="rd-section-sub">{filteredCandidates.length} students available on PrepMate</p>
+                  <p className="rd-section-sub">
+                    {candidatesLoading ? "Loading..." : `${filteredCandidates.length} students on PrepMate`}
+                  </p>
                 </div>
+                <button className="rd-btn-ghost rd-btn-sm" onClick={fetchCandidates}><Icon.RefreshCw /> Refresh</button>
               </div>
 
-              {/* Search + Filter */}
               <div className="rd-cand-toolbar">
                 <div className="rd-search-wrap">
                   <Icon.Search />
-                  <input
-                    className="rd-search-input"
-                    placeholder="Search by name, role, or skill..."
-                    value={candidateSearch}
-                    onChange={e => setCandidateSearch(e.target.value)}
-                  />
+                  <input className="rd-search-input" placeholder="Search by name, role, or skill..."
+                    value={candidateSearch} onChange={e => setCandidateSearch(e.target.value)} />
                   {candidateSearch && <button className="rd-search-clear" onClick={() => setCandidateSearch("")}><Icon.X /></button>}
                 </div>
                 <div className="rd-filter-pills">
-                  {["all", "available", "open", "Fresher", "Intern"].map(f => (
+                  {["all", "Fresher", "Intern", "1 yr", "React", "Python"].map(f => (
                     <button key={f} className={`rd-filter-pill ${candidateFilter === f ? "active" : ""}`} onClick={() => setCandidateFilter(f)}>
                       {f === "all" ? "All" : f}
                     </button>
@@ -594,99 +734,102 @@ export default function RecruiterDashboard() {
                 </div>
               </div>
 
-              {/* Candidate Grid */}
-              <div className="rd-cand-grid">
-                {filteredCandidates.map((c, i) => (
-                  <div key={c.id} className="rd-cand-card" style={{ "--i": i }}>
-                    <div className="rd-cand-card-top">
-                      <div className="rd-av rd-av-lg" style={{ background: `linear-gradient(135deg, ${avatarColor(c.avatar)})` }}>{c.avatar}</div>
-                      <div className="rd-cand-match">
-                        <span className="rd-match-num">{c.matchPct}%</span>
-                        <span className="rd-match-lbl">match</span>
-                      </div>
-                    </div>
-                    <h3 className="rd-cand-name">{c.name}</h3>
-                    <p className="rd-cand-role">{c.role}</p>
-                    <p className="rd-cand-college">{c.college}</p>
-                    <div className="rd-cand-meta">
-                      <span><Icon.MapPin />{c.location}</span>
-                      <span><Icon.Calendar />{c.experience}</span>
-                    </div>
-                    <div className="rd-cand-skills">
-                      {c.skills.slice(0, 3).map((s, i) => <span key={i} className="rd-skill-tag rd-skill-sm">{s}</span>)}
-                    </div>
-                    <div className="rd-cand-score-bar">
-                      <div className="rd-score-bar">
-                        <div className="rd-score-fill" style={{ width: `${c.score * 10}%` }} />
-                      </div>
-                      <span className="rd-score-num">{c.score}/10</span>
-                    </div>
-                    <div className="rd-cand-actions">
-                      <button className="rd-action-btn" onClick={() => setSelectedCandidate(c)}><Icon.Eye /> Profile</button>
-                      <button className="rd-action-btn rd-action-primary" onClick={() => { handleInvite(c); }}><Icon.Send /> Invite</button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {filteredCandidates.length === 0 && (
+              {candidatesLoading ? (
+                <div className="rd-empty-state"><div className="rd-loading-ring" /></div>
+              ) : filteredCandidates.length === 0 ? (
                 <div className="rd-empty-state">
-                  <div className="rd-empty-icon"><Icon.Search /></div>
-                  <h3>No candidates found</h3>
-                  <p>Try a different search term or filter.</p>
+                  <div className="rd-empty-icon"><Icon.Users /></div>
+                  <h3>{candidateSearch ? "No matches found" : "No candidates yet"}</h3>
+                  <p>{candidateSearch ? "Try a different search term." : "Students will appear here once they upload their resumes."}</p>
+                </div>
+              ) : (
+                <div className="rd-cand-grid">
+                  {filteredCandidates.map((c, i) => {
+                    const name = c.candidate_name || "Unknown";
+                    const init = getInitial(name);
+                    return (
+                      <div key={c.id} className="rd-cand-card" style={{ "--i": i }}>
+                        <div className="rd-cand-card-top">
+                          <div className="rd-av rd-av-lg" style={{ background: `linear-gradient(135deg, ${avatarColor(init)})` }}>{init}</div>
+                          {c.ats_score && (
+                            <div className="rd-cand-match">
+                              <span className="rd-match-num">{c.ats_score}</span>
+                              <span className="rd-match-lbl">ATS</span>
+                            </div>
+                          )}
+                        </div>
+                        <h3 className="rd-cand-name">{name}</h3>
+                        <p className="rd-cand-role">{c.role || "—"}</p>
+                        <p className="rd-cand-college">{c.college || c.candidate_email || "—"}</p>
+                        <div className="rd-cand-meta">
+                          {c.location && <span><Icon.MapPin />{c.location}</span>}
+                          {c.experience && <span><Icon.Calendar />{c.experience}</span>}
+                        </div>
+                        <div className="rd-cand-skills">
+                          {(c.skills || []).slice(0, 3).map((s, j) => <span key={j} className="rd-skill-tag rd-skill-sm">{s}</span>)}
+                        </div>
+                        {c.ats_score && (
+                          <div className="rd-cand-score-bar">
+                            <div className="rd-score-bar">
+                              <div className="rd-score-fill" style={{ width: `${c.ats_score * 10}%` }} />
+                            </div>
+                            <span className="rd-score-num">{c.ats_score}/10</span>
+                          </div>
+                        )}
+                        {c.resume_url && (
+                          <div className="rd-cand-has-resume"><Icon.FileText /> Resume available</div>
+                        )}
+                        <div className="rd-cand-actions">
+                          <button className="rd-action-btn" onClick={() => openCandidateDrawer(c)}><Icon.Eye /> Profile</button>
+                          <button className="rd-action-btn rd-action-primary" onClick={() => { setSelectedCandidate(c); setInviteTarget(c); }}><Icon.Send /> Invite</button>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
           )}
 
-          {/* ════ INTERVIEWS ════ */}
-          {activeTab === "interviews" && (
+          {/* ════ INVITES ════ */}
+          {activeTab === "invites" && (
             <div className="rd-tab-anim">
               <div className="rd-section-toolbar">
                 <div>
-                  <h2 className="rd-section-heading">Interview Tracker</h2>
-                  <p className="rd-section-sub">Track candidate interviews and scores</p>
+                  <h2 className="rd-section-heading">Interview Invites</h2>
+                  <p className="rd-section-sub">Track invites you've sent to candidates</p>
                 </div>
               </div>
               <div className="rd-card">
-                <div className="rd-table-wrap">
-                  <table className="rd-table">
-                    <thead>
-                      <tr>
-                        <th>Candidate</th>
-                        <th>Position</th>
-                        <th>Date</th>
-                        <th>Score</th>
-                        <th>Status</th>
-                        <th>Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {interviews.map(iv => (
-                        <tr key={iv.id}>
-                          <td>
-                            <div className="rd-cand-cell">
-                              <div className="rd-av rd-av-sm" style={{ background: `linear-gradient(135deg, ${avatarColor(iv.avatar)})` }}>{iv.avatar}</div>
-                              <div>
-                                <div className="rd-cand-cell-name">{iv.candidateName}</div>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="rd-td-muted">{iv.position}</td>
-                          <td className="rd-td-muted">{new Date(iv.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</td>
-                          <td>{iv.score ? <span className="rd-score-pill">{iv.score}</span> : <span className="rd-td-muted">Pending</span>}</td>
-                          <td><StatusBadge status={iv.status} /></td>
-                          <td>
-                            <button className="rd-action-btn" onClick={() => {
-                              const c = candidates.find(c => c.name === iv.candidateName);
-                              if (c) setSelectedCandidate(c);
-                            }}><Icon.Eye /> View</button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                {invites.length === 0 ? (
+                  <p className="rd-empty-hint" style={{ padding: "16px 0" }}>No invites sent yet. Go to Candidates to invite someone.</p>
+                ) : (
+                  <div className="rd-table-wrap">
+                    <table className="rd-table">
+                      <thead>
+                        <tr><th>Candidate</th><th>Position</th><th>Sent</th><th>Status</th></tr>
+                      </thead>
+                      <tbody>
+                        {invites.map(iv => {
+                          const name = iv.candidate_name || iv.candidate_id?.slice(0, 8) + "...";
+                          return (
+                            <tr key={iv.id}>
+                              <td>
+                                <div className="rd-cand-cell">
+                                  <div className="rd-av rd-av-sm" style={{ background: `linear-gradient(135deg, ${avatarColor(getInitial(name))})` }}>{getInitial(name)}</div>
+                                  <span>{name}</span>
+                                </div>
+                              </td>
+                              <td className="rd-td-muted">{iv.job_posts?.title || "—"}</td>
+                              <td className="rd-td-muted">{new Date(iv.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</td>
+                              <td><StatusBadge status={iv.status} /></td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -695,17 +838,14 @@ export default function RecruiterDashboard() {
           {activeTab === "analytics" && (
             <div className="rd-tab-anim">
               <div className="rd-section-toolbar">
-                <div>
-                  <h2 className="rd-section-heading">Analytics</h2>
-                  <p className="rd-section-sub">Hiring performance at a glance</p>
-                </div>
+                <div><h2 className="rd-section-heading">Analytics</h2><p className="rd-section-sub">Hiring performance at a glance</p></div>
               </div>
               <div className="rd-analytics-grid">
                 <div className="rd-card rd-analytics-card">
-                  <h3 className="rd-card-title">Score Distribution</h3>
+                  <h3 className="rd-card-title">ATS Score Distribution</h3>
                   <div className="rd-bar-chart">
                     {[...Array(10)].map((_, i) => {
-                      const count = candidates.filter(c => Math.floor(c.score) === i + 1).length;
+                      const count = candidates.filter(c => c.ats_score && Math.floor(c.ats_score) === i + 1).length;
                       return (
                         <div key={i} className="rd-bar-col">
                           <div className="rd-bar" style={{ height: `${count * 40}px`, minHeight: count ? "8px" : "0" }} />
@@ -714,26 +854,29 @@ export default function RecruiterDashboard() {
                       );
                     })}
                   </div>
-                  <p className="rd-chart-hint">Score (out of 10) — based on PrepMate interviews</p>
+                  <p className="rd-chart-hint">ATS Score (1–10) from Resume Analyzer</p>
                 </div>
 
                 <div className="rd-card rd-analytics-card">
                   <h3 className="rd-card-title">Top Skills in Pool</h3>
-                  <div className="rd-skill-analytics">
-                    {["React", "Python", "Node.js", "AWS", "Java", "Figma"].map((skill, i) => {
-                      const count = candidates.filter(c => c.skills.includes(skill)).length;
-                      const pct = Math.round((count / candidates.length) * 100);
-                      return (
-                        <div key={skill} className="rd-skill-row">
-                          <span className="rd-skill-row-name">{skill}</span>
-                          <div className="rd-skill-row-bar">
-                            <div className="rd-skill-row-fill" style={{ width: `${pct}%`, animationDelay: `${i * 0.1}s` }} />
-                          </div>
-                          <span className="rd-skill-row-pct">{pct}%</span>
-                        </div>
-                      );
-                    })}
-                  </div>
+                  {candidates.length === 0 ? <p className="rd-empty-hint">No data yet.</p> : (
+                    <div className="rd-skill-analytics">
+                      {(() => {
+                        const allSkills = candidates.flatMap(c => c.skills || []);
+                        const freq = allSkills.reduce((acc, s) => { acc[s] = (acc[s] || 0) + 1; return acc; }, {});
+                        return Object.entries(freq).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([skill, count], i) => {
+                          const pct = Math.round((count / candidates.length) * 100);
+                          return (
+                            <div key={skill} className="rd-skill-row">
+                              <span className="rd-skill-row-name">{skill}</span>
+                              <div className="rd-skill-row-bar"><div className="rd-skill-row-fill" style={{ width: `${pct}%`, animationDelay: `${i * 0.1}s` }} /></div>
+                              <span className="rd-skill-row-pct">{pct}%</span>
+                            </div>
+                          );
+                        });
+                      })()}
+                    </div>
+                  )}
                 </div>
 
                 <div className="rd-card">
@@ -743,14 +886,15 @@ export default function RecruiterDashboard() {
                       { label: "Fresher", color: "#667eea" },
                       { label: "Intern", color: "#f093fb" },
                       { label: "1 yr", color: "#43e97b" },
+                      { label: "2+ yr", color: "#f7971e" },
                     ].map(({ label, color }) => {
-                      const count = candidates.filter(c => c.experience === label || c.experience.startsWith(label)).length;
+                      const count = candidates.filter(c => (c.experience || "").toLowerCase().includes(label.toLowerCase())).length;
                       return (
                         <div key={label} className="rd-exp-row">
                           <span className="rd-exp-dot" style={{ background: color }} />
                           <span className="rd-exp-label">{label}</span>
                           <span className="rd-exp-count">{count}</span>
-                          <div className="rd-exp-bar"><div style={{ width: `${(count / candidates.length) * 100}%`, background: color }} /></div>
+                          <div className="rd-exp-bar"><div style={{ width: candidates.length ? `${(count / candidates.length) * 100}%` : "0%", background: color }} /></div>
                         </div>
                       );
                     })}
@@ -760,6 +904,7 @@ export default function RecruiterDashboard() {
                 <div className="rd-card">
                   <h3 className="rd-card-title">Post Performance</h3>
                   <div className="rd-post-perf-list">
+                    {posts.length === 0 && <p className="rd-empty-hint">No posts yet.</p>}
                     {posts.map(p => (
                       <div key={p.id} className="rd-post-perf-row">
                         <div>
@@ -772,7 +917,6 @@ export default function RecruiterDashboard() {
                         </div>
                       </div>
                     ))}
-                    {posts.length === 0 && <p className="rd-empty-hint">No posts yet.</p>}
                   </div>
                 </div>
               </div>
@@ -783,10 +927,7 @@ export default function RecruiterDashboard() {
           {activeTab === "settings" && (
             <div className="rd-tab-anim">
               <div className="rd-section-toolbar">
-                <div>
-                  <h2 className="rd-section-heading">Settings</h2>
-                  <p className="rd-section-sub">Manage your recruiter account</p>
-                </div>
+                <div><h2 className="rd-section-heading">Settings</h2><p className="rd-section-sub">Manage your recruiter account</p></div>
               </div>
               <div className="rd-settings-grid">
                 <div className="rd-card">
@@ -802,7 +943,7 @@ export default function RecruiterDashboard() {
                 <div className="rd-card">
                   <h3 className="rd-card-title">Notification Preferences</h3>
                   <div className="rd-toggle-list">
-                    {["New application received", "Interview completed", "Candidate score available", "Weekly digest"].map((label, i) => (
+                    {["New resume uploaded", "Invite accepted by candidate", "New PrepMate student joined", "Weekly digest"].map((label, i) => (
                       <div key={i} className="rd-toggle-row">
                         <span>{label}</span>
                         <div className="rd-toggle rd-toggle-on" />
@@ -817,24 +958,35 @@ export default function RecruiterDashboard() {
         </div>
       </main>
 
-      {/* ── Modals & Drawers ─────────────────────────── */}
+      {/* ── Modals & Drawers ── */}
       {showPostModal && (
         <PostModal
           onClose={() => { setShowPostModal(false); setEditingPost(null); }}
           onSubmit={handlePublishPost}
           editPost={editingPost}
+          saving={savingPost}
         />
       )}
 
-      {selectedCandidate && (
+      {selectedCandidate && !inviteTarget && (
         <CandidateDrawer
           candidate={selectedCandidate}
-          onClose={() => setSelectedCandidate(null)}
-          onInvite={handleInvite}
+          resumeUrl={resumeSignedUrl}
+          onClose={() => { setSelectedCandidate(null); setResumeSignedUrl(null); }}
+          onInvite={(c) => { setInviteTarget(c); }}
         />
       )}
 
-      {toast && <Toast msg={toast} onClose={() => setToast(null)} />}
+      {inviteTarget && (
+        <InviteModal
+          candidate={inviteTarget}
+          posts={posts.filter(p => p.active)}
+          onClose={() => { setInviteTarget(null); setSelectedCandidate(null); }}
+          onSend={handleSendInvite}
+        />
+      )}
+
+      {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
     </div>
   );
 }

@@ -1,290 +1,364 @@
 import { Link } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
 import "./Home.css";
 
-export default function Home() {
+function useIntersection(options = {}) {
+  const ref = useRef(null);
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) { setVisible(true); obs.disconnect(); }
+    }, { threshold: 0.15, ...options });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+  return [ref, visible];
+}
+
+function TypewriterText({ texts }) {
+  const [displayed, setDisplayed] = useState("");
+  const [textIdx, setTextIdx] = useState(0);
+  const [charIdx, setCharIdx] = useState(0);
+  const [deleting, setDeleting] = useState(false);
+
+  useEffect(() => {
+    const current = texts[textIdx];
+    let timeout;
+    if (!deleting && charIdx < current.length) {
+      timeout = setTimeout(() => setCharIdx(c => c + 1), 60);
+    } else if (!deleting && charIdx === current.length) {
+      timeout = setTimeout(() => setDeleting(true), 2000);
+    } else if (deleting && charIdx > 0) {
+      timeout = setTimeout(() => setCharIdx(c => c - 1), 35);
+    } else if (deleting && charIdx === 0) {
+      setDeleting(false);
+      setTextIdx(i => (i + 1) % texts.length);
+    }
+    setDisplayed(current.slice(0, charIdx));
+    return () => clearTimeout(timeout);
+  }, [charIdx, deleting, textIdx, texts]);
+
   return (
-    <div className="home-container">
-      {/* Navigation Header */}
-      <nav className="home-nav">
-        <div className="nav-content">
-          <div className="logo">
-            <div className="logo-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="logo-svg">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+    <span className="typewriter">
+      {displayed}<span className="cursor">|</span>
+    </span>
+  );
+}
+
+const modules = [
+  {
+    id: "01",
+    badge: "Most Popular",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z" />
+      </svg>
+    ),
+    label: "AI Mock Interview",
+    tagline: "Simulate. Practice. Ace It.",
+    desc: "Jump into a fully simulated AI-powered interview tailored to your job role. Our AI interviewer asks real-world questions, evaluates your answers in real time, and gives detailed feedback — just like a real interviewer.",
+    features: ["Role-specific question banks", "Real-time answer evaluation", "Detailed post-interview report", "Behavioral & technical rounds"],
+    cta: "Start Interview",
+    path: "/interview",
+    color: "#7c3aed",
+    accent: "#a78bfa",
+    glow: "rgba(124,58,237,0.35)",
+  },
+  {
+    id: "02",
+    badge: null,
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+      </svg>
+    ),
+    label: "Smart Resume Analyzer",
+    tagline: "Parse. Score. Improve.",
+    desc: "Upload your resume and let our AI dissect it from every angle — formatting, keyword density, ATS compatibility. You'll get an ATS score, section-by-section feedback, and an AI-enhanced version ready for top companies.",
+    features: ["ATS compatibility scoring", "Section-by-section feedback", "Keyword gap analysis", "AI-enhanced resume output"],
+    cta: "Analyze Resume",
+    path: "/resume",
+    color: "#0ea5e9",
+    accent: "#38bdf8",
+    glow: "rgba(14,165,233,0.35)",
+  },
+  {
+    id: "03",
+    badge: "New",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6-10l6-3m0 13l5.447 2.724A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4" />
+      </svg>
+    ),
+    label: "Skill Gap & Roadmap",
+    tagline: "Compare. Identify. Grow.",
+    desc: "Paste any Job Description and our AI compares it to your resume, identifies missing skills, tools, and experiences — then generates a personalized learning roadmap with resources, milestones, and timelines.",
+    features: ["JD vs Resume gap analysis", "Missing skills identification", "Personalized learning roadmap", "Resource & timeline planning"],
+    cta: "Build My Roadmap",
+    path: "/roadmap",
+    color: "#10b981",
+    accent: "#34d399",
+    glow: "rgba(16,185,129,0.35)",
+  },
+];
+
+const steps = [
+  { num: "01", title: "Pick Your Module", desc: "Choose from Mock Interview, Resume Analyzer, or Skill Roadmap based on what you need most." },
+  { num: "02", title: "Input Your Details", desc: "Tell the AI your role, experience, and goals. Upload a resume or paste a job description." },
+  { num: "03", title: "AI Does the Work", desc: "Our AI analyzes, simulates, and evaluates in real time with precision and depth." },
+  { num: "04", title: "Land the Offer", desc: "Walk into interviews confident. Apply smarter. Grow faster." },
+];
+
+export default function Home() {
+  const [heroRef, heroVisible] = useIntersection();
+  const [modulesRef, modulesVisible] = useIntersection();
+  const [stepsRef, stepsVisible] = useIntersection();
+  const [ctaRef, ctaVisible] = useIntersection();
+  const [activeModule, setActiveModule] = useState(0);
+  const [scrollY, setScrollY] = useState(0);
+
+  useEffect(() => {
+    const onScroll = () => setScrollY(window.scrollY);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  // Auto-rotate active module
+  useEffect(() => {
+    const t = setInterval(() => setActiveModule(m => (m + 1) % modules.length), 4000);
+    return () => clearInterval(t);
+  }, []);
+
+  return (
+    <div className="home">
+      {/* Ambient background */}
+      <div className="ambient">
+        <div className="orb orb-1" />
+        <div className="orb orb-2" />
+        <div className="orb orb-3" />
+        <div className="grid-overlay" />
+      </div>
+
+      {/* NAV */}
+      <nav className="nav" style={{ background: scrollY > 40 ? "rgba(6,6,12,0.92)" : "transparent" }}>
+        <div className="nav-inner">
+          <div className="nav-logo">
+            <div className="logo-mark">
+              <svg viewBox="0 0 32 32" fill="none">
+                <rect width="32" height="32" rx="10" fill="url(#lg)" />
+                <path d="M10 22L16 10L22 22" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M12.5 18H19.5" stroke="white" strokeWidth="2.5" strokeLinecap="round"/>
+                <defs>
+                  <linearGradient id="lg" x1="0" y1="0" x2="32" y2="32">
+                    <stop stopColor="#7c3aed"/>
+                    <stop offset="1" stopColor="#4f46e5"/>
+                  </linearGradient>
+                </defs>
               </svg>
             </div>
-            <div className="logo-text-container">
-              <span className="logo-text">PrepMate</span>
-              <span className="logo-ai">AI</span>
-            </div>
+            <span className="logo-name">PrepMate<em>AI</em></span>
           </div>
-          <div className="nav-links">
-            <Link to="/login" className="nav-link">Sign In</Link>
-            <Link to="/signup" className="nav-button">Start Free Trial</Link>
+          <div className="nav-actions">
+            <Link to="/login" className="nav-ghost">Sign In</Link>
+            <Link to="/signup" className="nav-pill">Get Started →</Link>
           </div>
         </div>
       </nav>
 
-      {/* Hero Section */}
-      <section className="hero-section">
-        <div className="hero-content">
-          <div className="hero-badge">
-            <span className="badge-dot"></span>
-            <span>Trusted by 50,000+ job seekers worldwide</span>
+      {/* HERO */}
+      <section className="hero" ref={heroRef}>
+        <div className={`hero-inner ${heroVisible ? "revealed" : ""}`}>
+          <div className="hero-eyebrow">
+            <span className="dot-live" />
+            Trusted by 50,000+ job seekers worldwide
           </div>
-          
-          <h1 className="hero-title">
-            Ace Your Next Interview with
-            <span className="gradient-text"> AI-Powered Preparation</span>
+          <h1 className="hero-h1">
+            Land Your Dream Job<br />
+            with{" "}
+            <span className="grad-text">
+              <TypewriterText texts={["AI Mock Interviews", "Resume Analysis", "Skill Roadmaps", "Real-Time Feedback"]} />
+            </span>
           </h1>
-          
-          <p className="hero-description">
-            Master behavioral questions, technical challenges, and case studies with 
-            personalized AI coaching. Real-time feedback, industry-specific scenarios, 
-            and proven strategies to land your dream job.
+          <p className="hero-sub">
+            Three powerful AI tools. One mission — get you hired. Practice interviews, fix your resume, and close every skill gap standing between you and your next offer.
           </p>
-
-          <div className="hero-buttons">
-            <Link to="/signup" className="btn-primary">
-              Start Practicing Free
-              <svg className="btn-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-              </svg>
-            </Link>
-            <Link to="/login" className="btn-secondary">
-              <svg className="btn-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              Watch Demo
-            </Link>
+          <div className="hero-ctas">
+            <Link to="/signup" className="cta-main">Start Free — No Card Needed</Link>
+            <a href="#modules" className="cta-ghost">See How It Works ↓</a>
           </div>
-
-          <div className="social-proof">
-            <div className="stats-group">
-              <div className="stat-item">
-                <div className="stat-number">98%</div>
-                <div className="stat-label">Success Rate</div>
+          <div className="hero-stats">
+            {[["98%", "Success Rate"], ["50K+", "Users Trained"], ["4.9★", "App Rating"]].map(([num, lbl]) => (
+              <div key={lbl} className="hero-stat">
+                <span className="stat-val">{num}</span>
+                <span className="stat-lbl">{lbl}</span>
               </div>
-              <div className="stat-divider"></div>
-              <div className="stat-item">
-                <div className="stat-number">50K+</div>
-                <div className="stat-label">Users</div>
-              </div>
-              <div className="stat-divider"></div>
-              <div className="stat-item">
-                <div className="stat-number">4.9/5</div>
-                <div className="stat-label">Rating</div>
-              </div>
-            </div>
+            ))}
           </div>
         </div>
 
-        {/* Floating Cards */}
-        <div className="hero-visual">
-          <div className="floating-card card-1">
-            <div className="card-icon purple">
-              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <div className="card-content">
-              <h4>AI Mock Interviews</h4>
-              <p>Practice with intelligent AI interviewer</p>
-              <div className="card-progress">
-                <div className="progress-bar" style={{width: '85%'}}></div>
-              </div>
-            </div>
-          </div>
-
-          <div className="floating-card card-2">
-            <div className="card-icon blue">
-              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-              </svg>
-            </div>
-            <div className="card-content">
-              <h4>Performance Analytics</h4>
-              <p>Track improvement over time</p>
-              <div className="mini-chart">
-                <div className="chart-bar" style={{height: '40%'}}></div>
-                <div className="chart-bar" style={{height: '60%'}}></div>
-                <div className="chart-bar" style={{height: '80%'}}></div>
-                <div className="chart-bar" style={{height: '95%'}}></div>
-              </div>
-            </div>
-          </div>
-
-          <div className="floating-card card-3">
-            <div className="card-icon green">
-              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-              </svg>
-            </div>
-            <div className="card-content">
-              <h4>Question Bank</h4>
-              <p>10,000+ curated questions</p>
-              <div className="card-tags">
-                <span className="tag">Behavioral</span>
-                <span className="tag">Technical</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Features Section */}
-      <section className="features-section">
-        <div className="section-header">
-          <h2 className="section-title">Everything You Need to Succeed</h2>
-          <p className="section-subtitle">Comprehensive interview preparation powered by advanced AI</p>
-        </div>
-        
-        <div className="features-grid">
-          <div className="feature-item">
-            <div className="feature-icon">
-              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-              </svg>
-            </div>
-            <h3>AI-Powered Feedback</h3>
-            <p>Get instant, detailed feedback on your answers with actionable insights to improve your performance</p>
-          </div>
-
-          <div className="feature-item">
-            <div className="feature-icon">
-              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <h3>Real-Time Practice</h3>
-            <p>Simulate actual interview conditions with timed responses and pressure scenarios</p>
-          </div>
-
-          <div className="feature-item">
-            <div className="feature-icon">
-              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-              </svg>
-            </div>
-            <h3>Industry-Specific</h3>
-            <p>Tailored questions for tech, finance, consulting, healthcare, and 50+ other industries</p>
-          </div>
-
-          <div className="feature-item">
-            <div className="feature-icon">
-              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-              </svg>
-            </div>
-            <h3>Progress Tracking</h3>
-            <p>Visualize your improvement with detailed analytics and personalized learning paths</p>
-          </div>
-
-          <div className="feature-item">
-            <div className="feature-icon">
-              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-              </svg>
-            </div>
-            <h3>Voice Recognition</h3>
-            <p>Practice speaking naturally with advanced speech-to-text technology</p>
-          </div>
-
-          <div className="feature-item">
-            <div className="feature-icon">
-              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-              </svg>
-            </div>
-            <h3>STAR Framework</h3>
-            <p>Master the proven STAR method for behavioral interviews with guided examples</p>
-          </div>
-        </div>
-      </section>
-
-      {/* Testimonials Section */}
-      <section className="testimonials-section">
-        <div className="section-header">
-          <h2 className="section-title">Success Stories</h2>
-          <p className="section-subtitle">Join thousands who landed their dream jobs</p>
-        </div>
-        
-        <div className="testimonials-grid">
-          <div className="testimonial-card">
-            <div className="testimonial-header">
-              <div className="testimonial-avatar" style={{background: 'linear-gradient(135deg, #667eea, #764ba2)'}}>SR</div>
-              <div className="testimonial-info">
-                <h4>Sarah Rodriguez</h4>
-                <p>Software Engineer @ Google</p>
-              </div>
-            </div>
-            <div className="testimonial-rating">
-              ⭐⭐⭐⭐⭐
-            </div>
-            <p className="testimonial-text">
-              "PrepMate AI helped me nail my Google interview. The AI feedback was incredibly detailed 
-              and helped me improve my communication skills significantly."
-            </p>
-          </div>
-
-          <div className="testimonial-card">
-            <div className="testimonial-header">
-              <div className="testimonial-avatar" style={{background: 'linear-gradient(135deg, #f093fb, #f5576c)'}}>MC</div>
-              <div className="testimonial-info">
-                <h4>Michael Chen</h4>
-                <p>Product Manager @ Microsoft</p>
-              </div>
-            </div>
-            <div className="testimonial-rating">
-              ⭐⭐⭐⭐⭐
-            </div>
-            <p className="testimonial-text">
-              "The industry-specific questions were spot-on. I felt completely prepared 
-              for every scenario they threw at me. Highly recommend!"
-            </p>
-          </div>
-
-          <div className="testimonial-card">
-            <div className="testimonial-header">
-              <div className="testimonial-avatar" style={{background: 'linear-gradient(135deg, #4facfe, #00f2fe)'}}>AP</div>
-              <div className="testimonial-info">
-                <h4>Aisha Patel</h4>
-                <p>Consultant @ McKinsey</p>
-              </div>
-            </div>
-            <div className="testimonial-rating">
-              ⭐⭐⭐⭐⭐
-            </div>
-            <p className="testimonial-text">
-              "The case study practice was invaluable. PrepMate AI's structured approach 
-              helped me think more clearly under pressure."
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="cta-section">
-        <div className="cta-content">
-          <h2 className="cta-title">Ready to Land Your Dream Job?</h2>
-          <p className="cta-subtitle">Start practicing today with our AI-powered interview coach</p>
-          <div className="cta-buttons">
-            <Link to="/signup" className="btn-primary">
-              Start Free Trial
-              <svg className="btn-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-              </svg>
+        {/* Module preview cards floating */}
+        <div className={`hero-cards ${heroVisible ? "revealed" : ""}`}>
+          {modules.map((mod, i) => (
+            <button
+              key={mod.id}
+              className={`preview-card ${activeModule === i ? "active" : ""}`}
+              style={{ "--mod-color": mod.color, "--mod-glow": mod.glow }}
+              onClick={() => setActiveModule(i)}
+            >
+              <span className="preview-num">{mod.id}</span>
+              <span className="preview-icon">{mod.icon}</span>
+              <span className="preview-label">{mod.label}</span>
+              {mod.badge && <span className="preview-badge">{mod.badge}</span>}
+            </button>
+          ))}
+          {/* Detail panel */}
+          <div
+            className="preview-detail"
+            style={{ "--mod-color": modules[activeModule].color, "--mod-glow": modules[activeModule].glow }}
+          >
+            <p className="pd-tagline">{modules[activeModule].tagline}</p>
+            <ul className="pd-feats">
+              {modules[activeModule].features.map(f => (
+                <li key={f}><span className="pd-check">✓</span> {f}</li>
+              ))}
+            </ul>
+            <Link to={modules[activeModule].path} className="pd-cta">
+              {modules[activeModule].cta} →
             </Link>
           </div>
-          <p className="cta-note">No credit card required • 7-day free trial • Cancel anytime</p>
         </div>
       </section>
 
-      {/* Background Elements */}
-      <div className="bg-gradient gradient-1"></div>
-      <div className="bg-gradient gradient-2"></div>
-      <div className="bg-gradient gradient-3"></div>
+      {/* MODULES DEEP DIVE */}
+      <section className="modules-section" id="modules" ref={modulesRef}>
+        <div className="section-label">Three Tools. One Goal.</div>
+        <h2 className={`section-h2 ${modulesVisible ? "revealed" : ""}`}>
+          Choose Your Module
+        </h2>
+        <p className="section-sub">Each module is a standalone AI powerhouse — use one or all three.</p>
+
+        <div className="modules-list">
+          {modules.map((mod, i) => (
+            <div
+              key={mod.id}
+              className={`module-card ${modulesVisible ? "revealed" : ""}`}
+              style={{ "--mod-color": mod.color, "--mod-accent": mod.accent, "--mod-glow": mod.glow, animationDelay: `${i * 0.15}s` }}
+            >
+              <div className="mc-header">
+                <div className="mc-num-wrap">
+                  <span className="mc-num">{mod.id}</span>
+                  {mod.badge && <span className="mc-badge">{mod.badge}</span>}
+                </div>
+                <div className="mc-icon">{mod.icon}</div>
+              </div>
+              <h3 className="mc-title">{mod.label}</h3>
+              <p className="mc-tagline">{mod.tagline}</p>
+              <p className="mc-desc">{mod.desc}</p>
+              <ul className="mc-features">
+                {mod.features.map(f => (
+                  <li key={f}>
+                    <span className="mc-check">✦</span>
+                    {f}
+                  </li>
+                ))}
+              </ul>
+              <Link to={mod.path} className="mc-cta">
+                {mod.cta}
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                </svg>
+              </Link>
+              <div className="mc-glow-bg" />
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* HOW IT WORKS */}
+      <section className="steps-section" ref={stepsRef}>
+        <div className="section-label">Simple Process</div>
+        <h2 className={`section-h2 ${stepsVisible ? "revealed" : ""}`}>From Zero to Offer-Ready</h2>
+        <p className="section-sub">Four steps is all it takes to transform your interview game.</p>
+
+        <div className="steps-track">
+          <div className="steps-line" />
+          {steps.map((step, i) => (
+            <div
+              key={step.num}
+              className={`step-item ${stepsVisible ? "revealed" : ""}`}
+              style={{ animationDelay: `${i * 0.12}s` }}
+            >
+              <div className="step-circle">
+                <span>{step.num}</span>
+              </div>
+              <div className="step-body">
+                <h4>{step.title}</h4>
+                <p>{step.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* SOCIAL PROOF */}
+      <section className="proof-section">
+        <div className="proof-inner">
+          {[
+            { init: "SR", name: "Sarah Rodriguez", role: "SWE @ Google", grad: "135deg,#7c3aed,#4f46e5", text: "PrepMate's AI interview gave me tougher questions than the actual Google panel. I was completely prepared." },
+            { init: "MC", name: "Michael Chen", role: "PM @ Microsoft", grad: "135deg,#0ea5e9,#0284c7", text: "The resume analyzer found 14 keyword gaps I had no idea about. Got 3 callbacks in one week after fixing them." },
+            { init: "AP", name: "Aisha Patel", role: "Consultant @ McKinsey", grad: "135deg,#10b981,#059669", text: "The skill roadmap told me exactly what to learn in 30 days. Landed my McKinsey offer on the first try." },
+          ].map((t, i) => (
+            <div key={t.name} className="proof-card" style={{ animationDelay: `${i * 0.1}s` }}>
+              <div className="proof-stars">★★★★★</div>
+              <p className="proof-text">"{t.text}"</p>
+              <div className="proof-author">
+                <div className="proof-avatar" style={{ background: `linear-gradient(${t.grad})` }}>{t.init}</div>
+                <div>
+                  <div className="proof-name">{t.name}</div>
+                  <div className="proof-role">{t.role}</div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* CTA FINAL */}
+      <section className="final-cta" ref={ctaRef}>
+        <div className={`fcta-inner ${ctaVisible ? "revealed" : ""}`}>
+          <div className="fcta-orb" />
+          <div className="section-label">Your Next Chapter Starts Now</div>
+          <h2 className="fcta-h2">Ready to Get Hired?</h2>
+          <p className="fcta-sub">Join 50,000+ professionals who used PrepMate AI to land their dream roles.</p>
+          <Link to="/signup" className="cta-main large">Start Free Trial — 7 Days</Link>
+          <p className="fcta-note">No credit card · Cancel anytime · Instant access</p>
+        </div>
+      </section>
+
+      {/* FOOTER */}
+      <footer className="footer">
+        <div className="footer-inner">
+          <div className="footer-logo">
+            <div className="logo-mark sm">
+              <svg viewBox="0 0 32 32" fill="none">
+                <rect width="32" height="32" rx="10" fill="url(#lg2)" />
+                <path d="M10 22L16 10L22 22" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M12.5 18H19.5" stroke="white" strokeWidth="2.5" strokeLinecap="round"/>
+                <defs>
+                  <linearGradient id="lg2" x1="0" y1="0" x2="32" y2="32">
+                    <stop stopColor="#7c3aed"/>
+                    <stop offset="1" stopColor="#4f46e5"/>
+                  </linearGradient>
+                </defs>
+              </svg>
+            </div>
+            <span>PrepMate<em>AI</em></span>
+          </div>
+          <p className="footer-copy">© 2026 PrepMateAI. All rights reserved.</p>
+        </div>
+      </footer>
     </div>
   );
 }
