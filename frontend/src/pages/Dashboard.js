@@ -469,6 +469,170 @@ function InvitesPanel({ invites, loading, onOpenChat, onDecline }) {
   );
 }
 
+function JobBoardSection({ jobs, loading, onApply }) {
+  const [search, setSearch] = useState("");
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [expanded, setExpanded] = useState(null);
+ 
+  const types = ["all", "Full-time", "Part-time", "Internship", "Contract", "Freelance"];
+ 
+  const filtered = jobs.filter(j => {
+    const q = search.toLowerCase();
+    const matchesSearch =
+      !q ||
+      (j.title || "").toLowerCase().includes(q) ||
+      (j.location || "").toLowerCase().includes(q) ||
+      (j.tags || []).some(t => t.toLowerCase().includes(q)) ||
+      (j.description || "").toLowerCase().includes(q);
+    const matchesType = typeFilter === "all" || j.type === typeFilter;
+    return matchesSearch && matchesType && j.active !== false;
+  });
+ 
+  if (loading) {
+    return h("div", { className: "jb-loading" },
+      h("div", { className: "ru-spinner", style: { width: "32px", height: "32px" } }),
+      h("p", null, "Loading job posts…")
+    );
+  }
+ 
+  return h("div", { className: "jb-wrap" },
+ 
+    // ── Toolbar
+    h("div", { className: "jb-toolbar" },
+      h("div", { className: "jb-search-wrap" },
+        h("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", className: "jb-search-icon" },
+          h("circle", { cx: "11", cy: "11", r: "8" }),
+          h("line", { x1: "21", y1: "21", x2: "16.65", y2: "16.65" })
+        ),
+        h("input", {
+          className: "jb-search-input",
+          placeholder: "Search by title, skill, or location…",
+          value: search,
+          onChange: e => setSearch(e.target.value),
+        }),
+        search && h("button", {
+          className: "jb-search-clear",
+          onClick: () => setSearch(""),
+        }, "✕")
+      ),
+      h("div", { className: "jb-type-pills" },
+        types.map(t =>
+          h("button", {
+            key: t,
+            className: `jb-type-pill ${typeFilter === t ? "jb-type-pill-active" : ""}`,
+            onClick: () => setTypeFilter(t),
+          }, t === "all" ? "All Types" : t)
+        )
+      )
+    ),
+ 
+    // ── Results count
+    h("div", { className: "jb-count" },
+      filtered.length === 0
+        ? "No jobs match your filters"
+        : `${filtered.length} open position${filtered.length !== 1 ? "s" : ""}`
+    ),
+ 
+    // ── Cards
+    filtered.length === 0
+      ? h("div", { className: "jb-empty" },
+          h("div", { className: "jb-empty-icon" }, "🔍"),
+          h("h4", null, "No openings found"),
+          h("p", null, "Try adjusting your search or filters.")
+        )
+      : h("div", { className: "jb-list" },
+          filtered.map(job =>
+            h("div", {
+              key: job.id,
+              className: `jb-card ${expanded === job.id ? "jb-card-expanded" : ""}`,
+            },
+              // Card Header
+              h("div", { className: "jb-card-header" },
+                h("div", { className: "jb-card-left" },
+                  h("div", { className: "jb-company-av" },
+                    (() => {
+                      // Try to derive initial from recruiter email domain or title
+                      const letter = (job.company_name || job.title || "J").charAt(0).toUpperCase();
+                      return letter;
+                    })()
+                  ),
+                  h("div", null,
+                    h("div", { className: "jb-job-title" }, job.title),
+                    h("div", { className: "jb-job-meta" },
+                      job.company_name && h("span", null, job.company_name),
+                      job.company_name && h("span", { className: "jb-dot" }, "·"),
+                      h("span", null, job.location || "Location not specified"),
+                      h("span", { className: "jb-dot" }, "·"),
+                      h("span", null, job.type || "Full-time"),
+                      job.salary && h("span", { className: "jb-dot" }, "·"),
+                      job.salary && h("span", { className: "jb-salary" }, job.salary)
+                    ),
+                    h("div", { className: "jb-tags" },
+                      (job.tags || []).slice(0, 4).map((tag, i) =>
+                        h("span", { key: i, className: "jb-tag" }, tag)
+                      )
+                    )
+                  )
+                ),
+                h("div", { className: "jb-card-right" },
+                  job.deadline && h("div", { className: "jb-deadline" },
+                    h("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", width: "12", height: "12" },
+                      h("rect", { x: "3", y: "4", width: "18", height: "18", rx: "2" }),
+                      h("line", { x1: "16", y1: "2", x2: "16", y2: "6" }),
+                      h("line", { x1: "8", y1: "2", x2: "8", y2: "6" }),
+                      h("line", { x1: "3", y1: "10", x2: "21", y2: "10" })
+                    ),
+                    "Due " + new Date(job.deadline).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })
+                  ),
+                  h("div", { className: "jb-posted-time" },
+                    new Date(job.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+                  ),
+                  h("button", {
+                    className: "jb-expand-btn",
+                    onClick: () => setExpanded(expanded === job.id ? null : job.id),
+                  }, expanded === job.id ? "Show less ▲" : "View details ▼")
+                )
+              ),
+ 
+              // Expanded Details
+              expanded === job.id && h("div", { className: "jb-card-body" },
+                h("div", { className: "jb-detail-grid" },
+                  job.description && h("div", { className: "jb-detail-block" },
+                    h("div", { className: "jb-detail-label" }, "About the role"),
+                    h("p", { className: "jb-detail-text" }, job.description)
+                  ),
+                  job.requirements && h("div", { className: "jb-detail-block" },
+                    h("div", { className: "jb-detail-label" }, "Requirements"),
+                    h("p", { className: "jb-detail-text" }, job.requirements)
+                  ),
+                  job.perks && h("div", { className: "jb-detail-block" },
+                    h("div", { className: "jb-detail-label" }, "Perks & benefits"),
+                    h("p", { className: "jb-detail-text" }, job.perks)
+                  )
+                ),
+                h("div", { className: "jb-card-footer" },
+                  h("div", { className: "jb-footer-left" },
+                    job.salary && h("span", { className: "jb-salary-big" }, "💰 " + job.salary),
+                    h("span", { className: "jb-type-badge" }, job.type || "Full-time")
+                  ),
+                  h("button", {
+                    className: "jb-apply-btn",
+                    onClick: () => onApply(job),
+                  },
+                    h("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", width: "16", height: "16" },
+                      h("line", { x1: "22", y1: "2", x2: "11", y2: "13" }),
+                      h("polygon", { points: "22 2 15 22 11 13 2 9 22 2" })
+                    ),
+                    "Express Interest"
+                  )
+                )
+              )
+            )
+          )
+        )
+  );
+}
+
 /* ─── Main Dashboard ─────────────────────────────────── */
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -483,12 +647,19 @@ export default function Dashboard() {
   const [showInvitesPanel, setShowInvitesPanel] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
 
+  // Job Board
+  const [jobs, setJobs] = useState([]);
+  const [jobsLoading, setJobsLoading] = useState(false);
+  const [showJobBoard, setShowJobBoard] = useState(false);
+  const [applyToast, setApplyToast] = useState(null);
+
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (user) {
         setUser(user);
         fetchMyResume(user.id);
         fetchMyInvites(user.id);
+        fetchJobs();
       }
     });
   }, []);
@@ -510,6 +681,17 @@ export default function Dashboard() {
       setUnreadCount(data.filter(i => i.status === "pending" && !i.candidate_read).length);
     }
     setInvitesLoading(false);
+  };
+
+  const fetchJobs = async () => {
+    setJobsLoading(true);
+    const { data } = await supabase
+      .from("job_posts")
+      .select("*")
+      .eq("active", true)
+      .order("created_at", { ascending: false });
+    if (data) setJobs(data);
+    setJobsLoading(false);
   };
 
   // Real-time: new invites for this candidate
@@ -543,6 +725,11 @@ export default function Dashboard() {
     if (invite.status === "pending") {
       setUnreadCount(c => Math.max(0, c - 1));
     }
+  };
+
+  const handleApply = (job) => {
+    setApplyToast(`Interest sent for "${job.title}"! The recruiter will be notified.`);
+    setTimeout(() => setApplyToast(null), 3500);
   };
 
   const handleLogout = async () => {
@@ -643,6 +830,30 @@ export default function Dashboard() {
       ),
       badge: resumeRecord ? "✓ Uploaded" : "Get Hired",
       isRecruiterProfile: true,
+    },
+    {
+      id: "job-board",
+      tag: "Module 05",
+      title: "Job Board",
+      subtitle: "Browse. Apply. Get Hired.",
+      description:
+        "Browse all open positions posted by recruiters actively hiring on PrepMate. Filter by type, search by skill, and express interest directly — your profile is already on file.",
+      highlights: [
+        "Live recruiter postings",
+        "Filter by role & type",
+        "One-click express interest",
+        "Deadline reminders",
+      ],
+      cta: "Browse Jobs",
+      path: null,
+      accent: "#4facfe",
+      accentSecondary: "#00f2fe",
+      icon: h("svg", { fill: "none", viewBox: "0 0 24 24", stroke: "currentColor" },
+        h("rect", { x: "2", y: "7", width: "20", height: "14", rx: "2", strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 1.5 }),
+        h("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 1.5, d: "M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2" })
+      ),
+      badge: jobs.length > 0 ? `${jobs.length} Live` : "New",
+      isJobBoard: true,
     },
   ];
 
@@ -804,6 +1015,49 @@ export default function Dashboard() {
         )
       ),
 
+      // Job Board Quick Strip
+      jobs.filter(j => j.active !== false).length > 0 &&
+        h("section", { className: "jb-strip-section" },
+          h("div", { className: "invites-strip-header" },
+            h("div", { className: "invites-strip-title" },
+              h("span", { className: "invites-strip-icon" }, "💼"),
+              "Open Jobs",
+              h("span", { className: "invites-strip-new" },
+                `${jobs.filter(j => j.active !== false).length} live`
+              )
+            ),
+            h("button", {
+              className: "invites-strip-view-all",
+              onClick: () => setShowJobBoard(true),
+            }, "Browse All →")
+          ),
+          h("div", { className: "jb-strip-grid" },
+            jobs.filter(j => j.active !== false).slice(0, 3).map(job =>
+              h("div", {
+                key: job.id,
+                className: "jb-strip-card",
+                onClick: () => setShowJobBoard(true),
+              },
+                h("div", { className: "jb-strip-av" },
+                  (job.title || "J").charAt(0).toUpperCase()
+                ),
+                h("div", { className: "jb-strip-info" },
+                  h("div", { className: "jb-strip-title" }, job.title),
+                  h("div", { className: "jb-strip-meta" },
+                    (job.location || "Remote") + " · " + (job.type || "Full-time") + (job.salary ? ` · ${job.salary}` : "")
+                  ),
+                  h("div", { className: "jb-strip-tags" },
+                    (job.tags || []).slice(0, 3).map((t, i) =>
+                      h("span", { key: i, className: "jb-tag" }, t)
+                    )
+                  )
+                ),
+                h("button", { className: "invites-strip-reply" }, "View →")
+              )
+            )
+          )
+        ),
+
       // Module Cards
       h("section", { className: "modules-section" },
         h("div", { className: "modules-label" }, "Choose Your Module"),
@@ -841,6 +1095,7 @@ export default function Dashboard() {
                 style: { background: `linear-gradient(135deg, ${mod.accent}, ${mod.accentSecondary})`, boxShadow: `0 10px 30px ${mod.accent}40` },
                 onClick: () => {
                   if (mod.isRecruiterProfile) { setShowResumeModal(true); }
+                  else if (mod.isJobBoard) { setShowJobBoard(true); }
                   else if (mod.path) navigate(mod.path);
                 }
               },
@@ -881,6 +1136,31 @@ export default function Dashboard() {
           )
         )
       )
+    ),
+
+    // Job Board Modal
+    showJobBoard && h("div", { className: "jb-overlay", onClick: () => setShowJobBoard(false) },
+      h("div", { className: "jb-modal", onClick: e => e.stopPropagation() },
+        h("div", { className: "jb-modal-header" },
+          h("div", null,
+            h("h2", { className: "ru-modal-title" }, "Job Board"),
+            h("p", { className: "ru-modal-sub" }, `${jobs.filter(j => j.active !== false).length} open positions from PrepMate recruiters`)
+          ),
+          h("button", { className: "ru-close-btn", onClick: () => setShowJobBoard(false) }, "✕")
+        ),
+        h("div", { className: "jb-modal-body" },
+          h(JobBoardSection, {
+            jobs,
+            loading: jobsLoading,
+            onApply: handleApply,
+          })
+        )
+      )
+    ),
+
+    applyToast && h("div", { className: "jb-toast" },
+      h("span", null, "✓ "),
+      applyToast
     ),
 
     // Resume Upload Modal

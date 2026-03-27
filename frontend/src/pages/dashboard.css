@@ -1940,3 +1940,548 @@ body {
   .chat-overlay { padding: 0; }
   .invites-strip-job { max-width: 130px; }
 }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   JOB BOARD CSS — Append this entire block to the bottom of dashboard.css
+   ───────────────────────────────────────────────────────────────────────────── */
+
+/* ─── Job Board Overlay & Modal ─────────────────────────────────────────────── */
+.jb-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.78);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  animation: ruOverlayIn 0.2s ease;
+}
+
+.jb-modal {
+  background: #0f0f1a;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 24px;
+  width: 100%;
+  max-width: 780px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 40px 100px rgba(0, 0, 0, 0.7);
+  animation: ruModalIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.jb-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px 28px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  flex-shrink: 0;
+}
+
+.jb-modal-body {
+  overflow-y: auto;
+  flex: 1;
+  padding: 24px 28px;
+}
+
+/* ─── Job Board Toolbar ──────────────────────────────────────────────────────── */
+.jb-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.jb-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.jb-search-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.jb-search-icon {
+  position: absolute;
+  left: 14px;
+  width: 16px;
+  height: 16px;
+  color: #4a4a6a;
+  pointer-events: none;
+  stroke-width: 2;
+}
+
+.jb-search-input {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  color: #fff;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  padding: 12px 40px 12px 44px;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+.jb-search-input::placeholder { color: #4a4a6a; }
+.jb-search-input:focus { border-color: rgba(79, 172, 254, 0.4); }
+
+.jb-search-clear {
+  position: absolute;
+  right: 12px;
+  background: none;
+  border: none;
+  color: #4a4a6a;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 4px;
+  transition: color 0.2s;
+}
+.jb-search-clear:hover { color: #fff; }
+
+.jb-type-pills {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.jb-type-pill {
+  padding: 6px 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  color: #a0aec0;
+  font-size: 12px;
+  font-weight: 500;
+  font-family: 'Inter', sans-serif;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+.jb-type-pill:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+.jb-type-pill-active {
+  background: rgba(79, 172, 254, 0.15) !important;
+  border-color: rgba(79, 172, 254, 0.4) !important;
+  color: #7dd3fc !important;
+}
+
+/* ─── Results count ──────────────────────────────────────────────────────────── */
+.jb-count {
+  font-size: 12px;
+  font-weight: 600;
+  color: #4a4a6a;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-family: 'Inter', sans-serif;
+}
+
+/* ─── Loading / Empty ────────────────────────────────────────────────────────── */
+.jb-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 60px 24px;
+  color: #718096;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+}
+
+.jb-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 48px 24px;
+  gap: 10px;
+}
+.jb-empty-icon { font-size: 40px; opacity: 0.5; }
+.jb-empty h4 { font-size: 16px; font-weight: 700; color: #fff; font-family: 'Inter', sans-serif; margin: 0; }
+.jb-empty p  { font-size: 13px; color: #4a4a6a; font-family: 'Inter', sans-serif; margin: 0; }
+
+/* ─── Job Card List ──────────────────────────────────────────────────────────── */
+.jb-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.jb-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 16px;
+  overflow: hidden;
+  transition: all 0.25s ease;
+}
+.jb-card:hover {
+  border-color: rgba(79, 172, 254, 0.25);
+  background: rgba(255, 255, 255, 0.05);
+}
+.jb-card-expanded {
+  border-color: rgba(79, 172, 254, 0.35) !important;
+  background: rgba(79, 172, 254, 0.03) !important;
+}
+
+/* ─── Card Header ────────────────────────────────────────────────────────────── */
+.jb-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 20px 22px;
+  gap: 16px;
+}
+
+.jb-card-left {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  flex: 1;
+  min-width: 0;
+}
+
+.jb-company-av {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #4facfe, #00f2fe);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  font-weight: 800;
+  color: #0a1628;
+  flex-shrink: 0;
+  box-shadow: 0 4px 16px rgba(79, 172, 254, 0.3);
+  font-family: 'Inter', sans-serif;
+}
+
+.jb-job-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 5px;
+  font-family: 'Inter', sans-serif;
+  letter-spacing: -0.2px;
+}
+
+.jb-job-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: #718096;
+  font-family: 'Inter', sans-serif;
+  margin-bottom: 10px;
+}
+
+.jb-dot {
+  color: #2d2d4a;
+  font-size: 12px;
+}
+
+.jb-salary {
+  color: #43e97b;
+  font-weight: 600;
+}
+
+.jb-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.jb-tag {
+  font-size: 11px;
+  font-weight: 600;
+  color: #7dd3fc;
+  background: rgba(79, 172, 254, 0.1);
+  border: 1px solid rgba(79, 172, 254, 0.2);
+  border-radius: 20px;
+  padding: 3px 10px;
+  font-family: 'Inter', sans-serif;
+  letter-spacing: 0.3px;
+}
+
+/* ─── Card Right (deadline, date, expand btn) ────────────────────────────────── */
+.jb-card-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.jb-deadline {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #fcd34d;
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  border-radius: 20px;
+  padding: 4px 10px;
+  font-family: 'Inter', sans-serif;
+}
+
+.jb-posted-time {
+  font-size: 11px;
+  color: #4a4a6a;
+  font-family: 'Inter', sans-serif;
+}
+
+.jb-expand-btn {
+  padding: 7px 14px;
+  background: rgba(79, 172, 254, 0.08);
+  border: 1px solid rgba(79, 172, 254, 0.2);
+  border-radius: 8px;
+  color: #7dd3fc;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: 'Inter', sans-serif;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+.jb-expand-btn:hover {
+  background: rgba(79, 172, 254, 0.16);
+  color: #fff;
+}
+
+/* ─── Expanded Card Body ─────────────────────────────────────────────────────── */
+.jb-card-body {
+  padding: 0 22px 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  animation: jbBodyIn 0.2s ease;
+}
+@keyframes jbBodyIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.jb-detail-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-top: 18px;
+  margin-bottom: 18px;
+}
+
+.jb-detail-block { display: flex; flex-direction: column; gap: 6px; }
+
+.jb-detail-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: #4a4a6a;
+  font-family: 'Inter', sans-serif;
+}
+
+.jb-detail-text {
+  font-size: 14px;
+  color: #a0aec0;
+  line-height: 1.65;
+  font-family: 'Inter', sans-serif;
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+/* ─── Card Footer (apply button) ─────────────────────────────────────────────── */
+.jb-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.jb-footer-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.jb-salary-big {
+  font-size: 14px;
+  font-weight: 600;
+  color: #43e97b;
+  font-family: 'Inter', sans-serif;
+}
+
+.jb-type-badge {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: #7dd3fc;
+  background: rgba(79, 172, 254, 0.1);
+  border: 1px solid rgba(79, 172, 254, 0.2);
+  border-radius: 20px;
+  padding: 4px 12px;
+  font-family: 'Inter', sans-serif;
+}
+
+.jb-apply-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 22px;
+  background: linear-gradient(135deg, #4facfe, #00f2fe);
+  border: none;
+  border-radius: 10px;
+  color: #0a1628;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  box-shadow: 0 8px 24px rgba(79, 172, 254, 0.35);
+  white-space: nowrap;
+}
+.jb-apply-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 32px rgba(79, 172, 254, 0.45);
+}
+
+/* ─── Quick strip on main dashboard ─────────────────────────────────────────── */
+.jb-strip-section {
+  margin-bottom: 40px;
+  animation: slideUp 0.5s ease-out both;
+  animation-delay: 0.15s;
+}
+
+.jb-strip-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.jb-strip-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 14px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+.jb-strip-card:hover {
+  background: rgba(79, 172, 254, 0.06);
+  border-color: rgba(79, 172, 254, 0.25);
+  transform: translateY(-2px);
+}
+
+.jb-strip-av {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #4facfe, #00f2fe);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 800;
+  color: #0a1628;
+  flex-shrink: 0;
+  font-family: 'Inter', sans-serif;
+}
+
+.jb-strip-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.jb-strip-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 3px;
+  font-family: 'Inter', sans-serif;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.jb-strip-meta {
+  font-size: 12px;
+  color: #718096;
+  font-family: 'Inter', sans-serif;
+  margin-bottom: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.jb-strip-tags {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+/* ─── Apply toast notification ───────────────────────────────────────────────── */
+.jb-toast {
+  position: fixed;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 22px;
+  background: rgba(15, 15, 26, 0.95);
+  border: 1px solid rgba(67, 233, 123, 0.3);
+  border-radius: 12px;
+  color: #86efac;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: 'Inter', sans-serif;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+  z-index: 9999;
+  backdrop-filter: blur(12px);
+  animation: jbToastIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  white-space: nowrap;
+}
+@keyframes jbToastIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* ─── Responsive ─────────────────────────────────────────────────────────────── */
+@media (max-width: 1024px) {
+  .jb-strip-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .jb-modal {
+    max-width: 100%;
+    height: 100%;
+    max-height: 100%;
+    border-radius: 0;
+  }
+  .jb-overlay { padding: 0; }
+  .jb-card-header { flex-direction: column; }
+  .jb-card-right { flex-direction: row; align-items: center; }
+  .jb-strip-grid { grid-template-columns: 1fr; }
+  .jb-type-pills { gap: 6px; }
+  .jb-card-footer { flex-direction: column; align-items: flex-start; }
+}
