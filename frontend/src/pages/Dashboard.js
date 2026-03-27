@@ -1,11 +1,11 @@
 import { supabase } from "../supabaseClient";
 import { useNavigate } from "react-router-dom";
-import { createElement as h, useState, useEffect } from "react";
+import { createElement as h, useState, useEffect, useCallback } from "react";
 import "./dashboard.css";
 
 /* ─── Resume Upload Modal ────────────────────────────── */
 function ResumeUploadModal({ user, onClose, onSuccess }) {
-  const [step, setStep] = useState("form"); // "form" | "uploading" | "done" | "error"
+  const [step, setStep] = useState("form");
   const [file, setFile] = useState(null);
   const [dragOver, setDragOver] = useState(false);
   const [form, setForm] = useState({
@@ -47,27 +47,20 @@ function ResumeUploadModal({ user, onClose, onSuccess }) {
     }
     setStep("uploading");
     setErrorMsg("");
-
     try {
       let resume_url = null;
       let resume_filename = null;
-
-      // Upload PDF to Supabase Storage if provided
       if (file) {
         const ext = file.name.split(".").pop();
         const path = `${user.id}/${Date.now()}.${ext}`;
         const { error: storageError } = await supabase.storage
           .from("resumes")
           .upload(path, file, { upsert: true, contentType: file.type });
-
         if (storageError) throw new Error(storageError.message);
         resume_url = path;
         resume_filename = file.name;
       }
-
       const skillsArray = form.skills.split(",").map(s => s.trim()).filter(Boolean);
-
-      // Upsert resume record (one per candidate)
       const { error: dbError } = await supabase
         .from("resumes")
         .upsert({
@@ -83,7 +76,6 @@ function ResumeUploadModal({ user, onClose, onSuccess }) {
           ...(resume_url ? { resume_url, resume_filename } : {}),
           updated_at: new Date().toISOString(),
         }, { onConflict: "candidate_id" });
-
       if (dbError) throw new Error(dbError.message);
       setStep("done");
       setTimeout(() => { onSuccess?.(); onClose(); }, 1800);
@@ -95,7 +87,6 @@ function ResumeUploadModal({ user, onClose, onSuccess }) {
 
   const experienceOpts = ["Fresher", "Intern", "1 yr", "2 yr", "3+ yr"];
 
-  // ─── Done state ───────────────────────────────────────
   if (step === "done") {
     return h("div", { className: "ru-overlay", onClick: onClose },
       h("div", { className: "ru-modal", onClick: e => e.stopPropagation() },
@@ -108,7 +99,6 @@ function ResumeUploadModal({ user, onClose, onSuccess }) {
     );
   }
 
-  // ─── Uploading state ──────────────────────────────────
   if (step === "uploading") {
     return h("div", { className: "ru-overlay", onClick: onClose },
       h("div", { className: "ru-modal", onClick: e => e.stopPropagation() },
@@ -121,10 +111,8 @@ function ResumeUploadModal({ user, onClose, onSuccess }) {
     );
   }
 
-  // ─── Form state ───────────────────────────────────────
   return h("div", { className: "ru-overlay", onClick: onClose },
     h("div", { className: "ru-modal", onClick: e => e.stopPropagation() },
-      // Header
       h("div", { className: "ru-modal-header" },
         h("div", null,
           h("h2", { className: "ru-modal-title" }, "Upload Your Resume"),
@@ -132,11 +120,7 @@ function ResumeUploadModal({ user, onClose, onSuccess }) {
         ),
         h("button", { className: "ru-close-btn", onClick: onClose }, "✕")
       ),
-
-      // Body
       h("div", { className: "ru-modal-body" },
-
-        // Drop zone
         h("div", {
           className: `ru-dropzone ${dragOver ? "ru-dropzone-over" : ""} ${file ? "ru-dropzone-filled" : ""}`,
           onDragOver: e => { e.preventDefault(); setDragOver(true); },
@@ -166,8 +150,6 @@ function ResumeUploadModal({ user, onClose, onSuccess }) {
                 h("div", { className: "ru-drop-hint" }, "PDF only · Max 5 MB · (Optional)")
               )
         ),
-
-        // Form grid
         h("div", { className: "ru-form-grid" },
           h("div", { className: "ru-field" },
             h("label", null, "Full Name *"),
@@ -219,8 +201,6 @@ function ResumeUploadModal({ user, onClose, onSuccess }) {
             })
           ),
         ),
-
-        // Visibility toggle
         h("div", { className: "ru-visibility-row" },
           h("div", null,
             h("div", { className: "ru-vis-title" }, "Visible to Recruiters"),
@@ -231,16 +211,258 @@ function ResumeUploadModal({ user, onClose, onSuccess }) {
             onClick: () => setForm(f => ({ ...f, visible_to_recruiters: !f.visible_to_recruiters }))
           })
         ),
-
-        // Error
         errorMsg && h("div", { className: "ru-error" }, errorMsg)
       ),
-
-      // Footer
       h("div", { className: "ru-modal-footer" },
         h("button", { className: "ru-btn-ghost", onClick: onClose }, "Cancel"),
-        h("button", { className: "ru-btn-primary", onClick: handleSubmit },
-          "Save Profile & Upload"
+        h("button", { className: "ru-btn-primary", onClick: handleSubmit }, "Save Profile & Upload")
+      )
+    )
+  );
+}
+
+/* ─── NEW: Chat / Messaging Modal ───────────────────── */
+function ChatModal({ invite, user, onClose }) {
+  const [messages, setMessages] = useState([]);
+  const [input, setInput] = useState("");
+  const [sending, setSending] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [recruiterInfo, setRecruiterInfo] = useState(null);
+
+  const fetchMessages = useCallback(async () => {
+    const { data } = await supabase
+      .from("invite_messages")
+      .select("*")
+      .eq("invite_id", invite.id)
+      .order("created_at", { ascending: true });
+    if (data) setMessages(data);
+    setLoading(false);
+  }, [invite.id]);
+
+  // NEW: Fetch recruiter information
+  const fetchRecruiterInfo = useCallback(async () => {
+    if (!invite.recruiter_id) return;
+    
+    const { data } = await supabase
+      .from("recruiters")
+      .select("company_name, full_name")
+      .eq("id", invite.recruiter_id)
+      .maybeSingle();
+    
+    if (data) {
+      setRecruiterInfo(data);
+    }
+  }, [invite.recruiter_id]);
+
+  useEffect(() => {
+    fetchMessages();
+    fetchRecruiterInfo();
+    // Real-time subscription
+    const channel = supabase
+      .channel(`chat:${invite.id}`)
+      .on("postgres_changes", {
+        event: "INSERT",
+        schema: "public",
+        table: "invite_messages",
+        filter: `invite_id=eq.${invite.id}`,
+      }, (payload) => {
+        setMessages(prev => [...prev, payload.new]);
+      })
+      .subscribe();
+    return () => supabase.removeChannel(channel);
+  }, [fetchMessages, fetchRecruiterInfo, invite.id]);
+
+  // Mark invite as read when candidate opens chat
+  useEffect(() => {
+    if (invite.status === "pending") {
+      supabase.from("interview_invites")
+        .update({ status: "accepted", candidate_read: true })
+        .eq("id", invite.id)
+        .then(() => {});
+    }
+  }, [invite.id, invite.status]);
+
+  const handleSend = async () => {
+    if (!input.trim()) return;
+    setSending(true);
+    const text = input.trim();
+    setInput("");
+    await supabase.from("invite_messages").insert({
+      invite_id: invite.id,
+      sender_id: user.id,
+      sender_role: "candidate",
+      content: text,
+    });
+    setSending(false);
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
+  // Get recruiter display name and company
+  const getRecruiterDisplayName = () => {
+    if (recruiterInfo?.full_name) return recruiterInfo.full_name;
+    if (invite.recruiter_email) {
+      return invite.recruiter_email.split("@")[0]
+        .split(/[._-]/)
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(" ");
+    }
+    return "Recruiter";
+  };
+
+  const getCompanyName = () => {
+    if (recruiterInfo?.company_name) return recruiterInfo.company_name;
+    if (invite.recruiter_email) {
+      const domain = invite.recruiter_email.split("@")[1]?.split(".")[0] || "Company";
+      return domain.charAt(0).toUpperCase() + domain.slice(1);
+    }
+    return "Company";
+  };
+
+  const recruiterName = getRecruiterDisplayName();
+  const companyName = getCompanyName();
+  const jobTitle = invite.job_posts?.title || "Interview Opportunity";
+
+  return h("div", { className: "chat-overlay", onClick: onClose },
+    h("div", { className: "chat-modal", onClick: e => e.stopPropagation() },
+      // Header
+      h("div", { className: "chat-header" },
+        h("div", { className: "chat-header-left" },
+          h("div", { className: "chat-avatar" },
+            recruiterName.charAt(0).toUpperCase()
+          ),
+          h("div", null,
+            h("div", { className: "chat-header-name" }, recruiterName),
+            h("div", { className: "chat-header-role" }, `${companyName} · ${jobTitle}`)
+          )
+        ),
+        h("button", { className: "ru-close-btn", onClick: onClose }, "✕")
+      ),
+
+      // Invite context banner
+      h("div", { className: "chat-invite-banner" },
+        h("div", { className: "chat-invite-icon" }, "💼"),
+        h("div", null,
+          h("div", { className: "chat-invite-title" }, jobTitle),
+          h("div", { className: "chat-invite-sub" }, `Interview invitation from ${companyName}`)
+        )
+      ),
+
+      // Messages (rest remains the same)
+      h("div", { className: "chat-messages", id: "chat-scroll" },
+        loading
+          ? h("div", { className: "chat-loading" },
+              h("div", { className: "ru-spinner" })
+            )
+          : messages.length === 0
+            ? h("div", { className: "chat-empty" },
+                h("div", { className: "chat-empty-icon" }, "💬"),
+                h("p", null, "Start the conversation by replying to the invite below")
+              )
+            : messages.map((msg, i) => {
+                const isCandidate = msg.sender_role === "candidate";
+                return h("div", {
+                  key: msg.id || i,
+                  className: `chat-bubble-wrap ${isCandidate ? "chat-bubble-right" : "chat-bubble-left"}`
+                },
+                  h("div", { className: `chat-bubble ${isCandidate ? "chat-bubble-me" : "chat-bubble-them"}` },
+                    msg.content
+                  ),
+                  h("div", { className: "chat-bubble-time" },
+                    new Date(msg.created_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })
+                  )
+                );
+              })
+      ),
+
+      // Input (rest remains the same)
+      h("div", { className: "chat-input-row" },
+        h("textarea", {
+          className: "chat-input",
+          placeholder: "Type your message… (Enter to send)",
+          value: input,
+          onChange: e => setInput(e.target.value),
+          onKeyDown: handleKeyDown,
+          rows: 2,
+        }),
+        h("button", {
+          className: `chat-send-btn ${sending ? "chat-send-sending" : ""}`,
+          onClick: handleSend,
+          disabled: sending || !input.trim(),
+        },
+          sending
+            ? h("div", { className: "ru-spinner", style: { width: "18px", height: "18px", borderWidth: "2px" } })
+            : h("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", width: "20", height: "20" },
+                h("line", { x1: "22", y1: "2", x2: "11", y2: "13" }),
+                h("polygon", { points: "22 2 15 22 11 13 2 9 22 2" })
+              )
+        )
+      )
+    )
+  );
+}
+
+/* ─── NEW: Invites Panel ─────────────────────────────── */
+function InvitesPanel({ invites, loading, onOpenChat, onDecline }) {
+  if (loading) {
+    return h("div", { className: "invites-loading" },
+      h("div", { className: "ru-spinner", style: { width: "28px", height: "28px" } })
+    );
+  }
+
+  if (invites.length === 0) {
+    return h("div", { className: "invites-empty" },
+      h("div", { className: "invites-empty-icon" }, "📭"),
+      h("h4", null, "No invites yet"),
+      h("p", null, "Once a recruiter invites you, it will appear here.")
+    );
+  }
+
+  return h("div", { className: "invites-list" },
+    invites.map(invite =>
+      h("div", {
+        key: invite.id,
+        className: `invite-item ${invite.status === "pending" ? "invite-item-new" : ""}`
+      },
+        // Status dot
+        invite.status === "pending" && h("div", { className: "invite-unread-dot" }),
+
+        h("div", { className: "invite-item-left" },
+          h("div", { className: "invite-company-av" },
+            (invite.recruiter_email?.split("@")[1]?.charAt(0) || "R").toUpperCase()
+          ),
+          h("div", null,
+            h("div", { className: "invite-company-name" },
+              (() => {
+                const domain = invite.recruiter_email?.split("@")[1]?.split(".")[0] || "Company";
+                return domain.charAt(0).toUpperCase() + domain.slice(1);
+              })()
+            ),
+            h("div", { className: "invite-job-title" }, invite.job_posts?.title || "Interview Opportunity"),
+            h("div", { className: "invite-preview" }, invite.message?.slice(0, 80) + (invite.message?.length > 80 ? "…" : "")),
+            h("div", { className: "invite-time" },
+              new Date(invite.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+            )
+          )
+        ),
+
+        h("div", { className: "invite-item-actions" },
+          h("span", {
+            className: `invite-status-badge invite-status-${invite.status}`
+          }, invite.status === "pending" ? "New" : invite.status === "accepted" ? "Replied" : "Declined"),
+          h("button", {
+            className: "invite-reply-btn",
+            onClick: () => onOpenChat(invite)
+          }, "💬 Reply"),
+          invite.status === "pending" && h("button", {
+            className: "invite-decline-btn",
+            onClick: () => onDecline(invite.id)
+          }, "Decline")
         )
       )
     )
@@ -252,13 +474,21 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [showResumeModal, setShowResumeModal] = useState(false);
-  const [resumeRecord, setResumeRecord] = useState(null); // existing resume
+  const [resumeRecord, setResumeRecord] = useState(null);
+
+  // NEW: invites & chat state
+  const [invites, setInvites] = useState([]);
+  const [invitesLoading, setInvitesLoading] = useState(false);
+  const [activeChat, setActiveChat] = useState(null);
+  const [showInvitesPanel, setShowInvitesPanel] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (user) {
         setUser(user);
         fetchMyResume(user.id);
+        fetchMyInvites(user.id);
       }
     });
   }, []);
@@ -266,6 +496,53 @@ export default function Dashboard() {
   const fetchMyResume = async (uid) => {
     const { data } = await supabase.from("resumes").select("*").eq("candidate_id", uid).maybeSingle();
     if (data) setResumeRecord(data);
+  };
+
+  const fetchMyInvites = async (uid) => {
+    setInvitesLoading(true);
+    const { data } = await supabase
+      .from("interview_invites")
+      .select("*, job_posts(title)")
+      .eq("candidate_id", uid)
+      .order("created_at", { ascending: false });
+    if (data) {
+      setInvites(data);
+      setUnreadCount(data.filter(i => i.status === "pending" && !i.candidate_read).length);
+    }
+    setInvitesLoading(false);
+  };
+
+  // Real-time: new invites for this candidate
+  useEffect(() => {
+    if (!user) return;
+    const channel = supabase
+      .channel(`invites:${user.id}`)
+      .on("postgres_changes", {
+        event: "INSERT",
+        schema: "public",
+        table: "interview_invites",
+        filter: `candidate_id=eq.${user.id}`,
+      }, (payload) => {
+        setInvites(prev => [payload.new, ...prev]);
+        setUnreadCount(c => c + 1);
+      })
+      .subscribe();
+    return () => supabase.removeChannel(channel);
+  }, [user]);
+
+  const handleDeclineInvite = async (inviteId) => {
+    await supabase.from("interview_invites")
+      .update({ status: "declined" })
+      .eq("id", inviteId);
+    setInvites(prev => prev.map(i => i.id === inviteId ? { ...i, status: "declined" } : i));
+  };
+
+  const handleOpenChat = (invite) => {
+    setActiveChat(invite);
+    // Mark unread cleared
+    if (invite.status === "pending") {
+      setUnreadCount(c => Math.max(0, c - 1));
+    }
   };
 
   const handleLogout = async () => {
@@ -284,7 +561,7 @@ export default function Dashboard() {
       title: "AI Mock Interview",
       subtitle: "Simulate. Practice. Ace It.",
       description:
-        "Jump into a fully simulated AI-powered interview session tailored to your job role and experience level. Our AI interviewer asks real-world technical and behavioral questions, evaluates your answers in real time, and provides detailed feedback — just like a real interviewer would. Perfect for freshers and experienced professionals alike.",
+        "Jump into a fully simulated AI-powered interview session tailored to your job role and experience level. Our AI interviewer asks real-world technical and behavioral questions, evaluates your answers in real time, and provides detailed feedback — just like a real interviewer would.",
       highlights: [
         "Role-specific question banks",
         "Real-time answer evaluation",
@@ -306,7 +583,7 @@ export default function Dashboard() {
       title: "Resume Analyzer",
       subtitle: "Parse. Score. Improve.",
       description:
-        "Upload your resume and let our AI dissect it from every angle. We analyze your formatting, content quality, keyword density, and ATS compatibility. You'll receive an ATS score, section-by-section feedback, and an improved version of your resume tailored for modern applicant tracking systems.",
+        "Upload your resume and let our AI dissect it from every angle. We analyze your formatting, content quality, keyword density, and ATS compatibility. You'll receive an ATS score, section-by-section feedback, and an improved version of your resume.",
       highlights: [
         "ATS compatibility scoring",
         "Section-by-section feedback",
@@ -328,7 +605,7 @@ export default function Dashboard() {
       title: "Skill Gap & Roadmap",
       subtitle: "Compare. Identify. Grow.",
       description:
-        "Paste any Job Description and let our AI compare it against your resume to find exactly where you stand. It identifies missing technical skills, tools, and experiences — then generates a personalized learning roadmap with resources, milestones, and timelines to help you close the gap.",
+        "Paste any Job Description and let our AI compare it against your resume to find exactly where you stand. It identifies missing technical skills, tools, and experiences — then generates a personalized learning roadmap.",
       highlights: [
         "JD vs Resume gap analysis",
         "Missing skills identification",
@@ -358,7 +635,7 @@ export default function Dashboard() {
         "Update anytime",
       ],
       cta: resumeRecord ? "Update Profile" : "Upload Resume",
-      path: null, // handled via modal
+      path: null,
       accent: "#f7971e",
       accentSecondary: "#ffd200",
       icon: h("svg", { fill: "none", viewBox: "0 0 24 24", stroke: "currentColor" },
@@ -398,6 +675,18 @@ export default function Dashboard() {
           h("span", { className: "dashboard-resume-dot" }),
           "Profile Live"
         ),
+        // NEW: Invites bell
+        h("button", {
+          className: "invites-bell-btn",
+          onClick: () => setShowInvitesPanel(p => !p),
+          title: "Interview Invites"
+        },
+          h("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", width: "20", height: "20" },
+            h("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" }),
+            h("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M13.73 21a2 2 0 01-3.46 0" })
+          ),
+          unreadCount > 0 && h("span", { className: "invites-bell-badge" }, unreadCount)
+        ),
         h("button", { className: "logout-btn", onClick: handleLogout },
           h("svg", { fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", width: "16", height: "16" },
             h("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" })
@@ -405,6 +694,30 @@ export default function Dashboard() {
           "Logout"
         )
       )
+    ),
+
+    // NEW: Invites Sidebar Panel
+    showInvitesPanel && h("div", {
+      className: "invites-panel-overlay",
+      onClick: () => setShowInvitesPanel(false)
+    }),
+    h("aside", { className: `invites-panel ${showInvitesPanel ? "invites-panel-open" : ""}` },
+      h("div", { className: "invites-panel-header" },
+        h("div", null,
+          h("h3", { className: "invites-panel-title" }, "Interview Invites"),
+          h("p", { className: "invites-panel-sub" }, `${invites.length} total · ${unreadCount} new`)
+        ),
+        h("button", { className: "ru-close-btn", onClick: () => setShowInvitesPanel(false) }, "✕")
+      ),
+      h(InvitesPanel, {
+        invites,
+        loading: invitesLoading,
+        onOpenChat: (invite) => {
+          handleOpenChat(invite);
+          setShowInvitesPanel(false);
+        },
+        onDecline: handleDeclineInvite,
+      })
     ),
 
     h("main", { className: "dashboard-main" },
@@ -436,8 +749,57 @@ export default function Dashboard() {
           ),
           h("div", { className: "hero-stat-divider" }),
           h("div", { className: "hero-stat" },
-            h("span", { className: "hero-stat-value" }, "6.5h"),
-            h("span", { className: "hero-stat-label" }, "Practice Time")
+            h("span", { className: "hero-stat-value" }, invites.length || "0"),
+            h("span", { className: "hero-stat-label" }, "Invites Received")
+          )
+        )
+      ),
+
+      // NEW: Invites quick strip (if any)
+      invites.length > 0 && h("section", { className: "invites-strip-section" },
+        h("div", { className: "invites-strip-header" },
+          h("div", { className: "invites-strip-title" },
+            h("span", { className: "invites-strip-icon" }, "🔔"),
+            "Recruiter Invites",
+            unreadCount > 0 && h("span", { className: "invites-strip-new" }, `${unreadCount} new`)
+          ),
+          h("button", {
+            className: "invites-strip-view-all",
+            onClick: () => setShowInvitesPanel(true)
+          }, "View All →")
+        ),
+        h("div", { className: "invites-strip-list" },
+          invites.slice(0, 3).map(invite =>
+            h("div", {
+              key: invite.id,
+              className: `invites-strip-card ${invite.status === "pending" ? "invites-strip-card-new" : ""}`,
+              onClick: () => handleOpenChat(invite)
+            },
+              h("div", { className: "invites-strip-card-left" },
+                h("div", { className: "invites-strip-av" },
+                  (invite.recruiter_email?.split("@")[1]?.charAt(0) || "R").toUpperCase()
+                ),
+                h("div", null,
+                  h("div", { className: "invites-strip-company" },
+                    (() => {
+                      const d = invite.recruiter_email?.split("@")[1]?.split(".")[0] || "Company";
+                      return d.charAt(0).toUpperCase() + d.slice(1);
+                    })()
+                  ),
+                  h("div", { className: "invites-strip-job" }, invite.job_posts?.title || "Interview Opportunity"),
+                  h("div", { className: "invites-strip-date" },
+                    new Date(invite.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })
+                  )
+                )
+              ),
+              h("div", { className: "invites-strip-card-right" },
+                h("span", { className: `invites-strip-status invites-strip-status-${invite.status}` },
+                  invite.status === "pending" ? "New" : invite.status === "accepted" ? "Replied" : "Declined"
+                ),
+                h("button", { className: "invites-strip-reply" }, "💬 Reply")
+              ),
+              invite.status === "pending" && h("div", { className: "invites-strip-dot" })
+            )
           )
         )
       ),
@@ -501,9 +863,13 @@ export default function Dashboard() {
         h("div", { className: "activity-list" },
           [
             ...(resumeRecord ? [{ label: "Resume uploaded — visible to recruiters", time: new Date(resumeRecord.updated_at || resumeRecord.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short" }), color: "#f7971e" }] : []),
+            ...(invites.slice(0, 2).map(inv => ({
+              label: `Interview invite from ${(inv.recruiter_email?.split("@")[1]?.split(".")[0] || "recruiter")} — ${inv.job_posts?.title || "role"}`,
+              time: new Date(inv.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short" }),
+              color: "#43e97b"
+            }))),
             { label: "Completed Technical Interview", time: "2 hours ago", color: "#667eea" },
             { label: "Uploaded Resume for Analysis", time: "Yesterday", color: "#f093fb" },
-            { label: "Generated Skill Roadmap — Frontend Dev", time: "2 days ago", color: "#43e97b" },
           ].slice(0, 4).map((item, i) =>
             h("div", { className: "activity-item", key: i },
               h("div", { className: "activity-dot", style: { background: item.color } }),
@@ -522,6 +888,16 @@ export default function Dashboard() {
       user,
       onClose: () => setShowResumeModal(false),
       onSuccess: () => user && fetchMyResume(user.id),
+    }),
+
+    // NEW: Chat Modal
+    activeChat && h(ChatModal, {
+      invite: activeChat,
+      user,
+      onClose: () => {
+        setActiveChat(null);
+        fetchMyInvites(user.id);
+      }
     })
   );
 }
