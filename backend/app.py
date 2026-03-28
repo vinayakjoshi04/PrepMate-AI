@@ -7,23 +7,21 @@ import traceback
 import os
 from werkzeug.utils import secure_filename
 
-# Using Hugging Face + Llama
 from huggingfaceService import extract_skills, generate_questions, call_huggingface, extract_json_from_text
 
 app = Flask(__name__)
 
-# CORS Configuration - Allow your Vercel frontend + Render backend
 CORS(app, resources={
     r"/api/*": {
         "origins": [
             "https://prep-mate-ai-eight.vercel.app",
-            "https://*.vercel.app",  # All Vercel preview URLs
-            "http://localhost:3000",  # Local development - React
-            "http://localhost:5173",  # Local development - Vite
-            "http://localhost:5000",  # Local development - Flask
-            "http://127.0.0.1:3000",  # Alternative localhost
-            "http://127.0.0.1:5173",  # Alternative localhost
-            "http://127.0.0.1:5000",  # Alternative localhost
+            "https://*.vercel.app",
+            "http://localhost:3000",
+            "http://localhost:5173",
+            "http://localhost:5000",
+            "http://127.0.0.1:3000",
+            "http://127.0.0.1:5173",
+            "http://127.0.0.1:5000",
         ],
         "methods": ["GET", "POST", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization"],
@@ -32,7 +30,6 @@ CORS(app, resources={
     }
 })
 
-# File upload configuration
 UPLOAD_FOLDER = 'uploads'
 ALLOWED_EXTENSIONS = {'pdf', 'doc', 'docx', 'txt'}
 MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
@@ -43,13 +40,12 @@ if not os.path.exists(UPLOAD_FOLDER):
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = MAX_FILE_SIZE
 
-# Add global OPTIONS handler for all routes
+
+# ─── Preflight ────────────────────────────────────────────────────────────────
+
 @app.before_request
 def handle_preflight():
-    """Handle OPTIONS preflight requests globally"""
     if request.method == "OPTIONS":
-        origin = request.headers.get('Origin', 'No origin')
-        print(f"🔄 OPTIONS Preflight request from: {origin}")
         response = jsonify({"status": "ok"})
         response.headers.add("Access-Control-Allow-Origin", request.headers.get('Origin', '*'))
         response.headers.add("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
@@ -57,55 +53,125 @@ def handle_preflight():
         response.headers.add("Access-Control-Max-Age", "3600")
         return response, 200
 
+
+# ─── Utilities ────────────────────────────────────────────────────────────────
+
 def allowed_file(filename):
-    """Check if file extension is allowed"""
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+
+def clean_json_response(text):
+    text = re.sub(r'```json\s*', '', text)
+    text = re.sub(r'```\s*', '', text)
+    return text.strip()
+
+
+def repair_json(text):
+    """
+    Best-effort repair of truncated/malformed JSON.
+    1. Strip fences + leading prose.
+    2. Direct parse.
+    3. Extract outermost balanced { }.
+    4. Trim lines from bottom until parseable.
+    Returns None if all attempts fail.
+    """
+    text = re.sub(r'```json\s*', '', text)
+    text = re.sub(r'```\s*', '', text)
+    text = text.strip()
+
+    brace_pos = text.find('{')
+    if brace_pos == -1:
+        return None
+    text = text[brace_pos:]
+
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+
+    depth = 0
+    end_pos = -1
+    in_string = False
+    escape_next = False
+    for i, ch in enumerate(text):
+        if escape_next:
+            escape_next = False
+            continue
+        if ch == '\\' and in_string:
+            escape_next = True
+            continue
+        if ch == '"':
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if ch == '{':
+            depth += 1
+        elif ch == '}':
+            depth -= 1
+            if depth == 0:
+                end_pos = i
+                break
+
+    if end_pos != -1:
+        try:
+            return json.loads(text[:end_pos + 1])
+        except json.JSONDecodeError:
+            pass
+
+    lines = text.splitlines()
+    for trim in range(len(lines)):
+        attempt = '\n'.join(lines[:len(lines) - trim]).rstrip().rstrip(',')
+        open_braces   = attempt.count('{') - attempt.count('}')
+        open_brackets = attempt.count('[') - attempt.count(']')
+        attempt += ']' * open_brackets + '}' * open_braces
+        try:
+            return json.loads(attempt)
+        except json.JSONDecodeError:
+            continue
+
+    return None
+
+
 def extract_text_from_pdf(file_path):
-    """Extract text from PDF file"""
     try:
         import PyPDF2
         text = ""
-        with open(file_path, 'rb') as file:
-            pdf_reader = PyPDF2.PdfReader(file)
-            for page in pdf_reader.pages:
-                text += page.extract_text()
+        with open(file_path, 'rb') as f:
+            reader = PyPDF2.PdfReader(f)
+            for page in reader.pages:
+                text += page.extract_text() or ""
         return text
     except Exception as e:
         print(f"PDF extraction error: {e}")
         return None
 
+
 def extract_text_from_docx(file_path):
-    """Extract text from DOCX file"""
     try:
         import docx
         doc = docx.Document(file_path)
-        text = "\n".join([paragraph.text for paragraph in doc.paragraphs])
-        return text
+        return "\n".join(p.text for p in doc.paragraphs)
     except Exception as e:
         print(f"DOCX extraction error: {e}")
         return None
 
+
 def extract_text_from_doc(file_path):
-    """Extract text from DOC file (older Word format)"""
     try:
         import docx
         doc = docx.Document(file_path)
-        text = "\n".join([paragraph.text for paragraph in doc.paragraphs])
+        text = "\n".join(p.text for p in doc.paragraphs)
         return text if text.strip() else None
     except Exception as e:
-        print(f"DOC extraction error with python-docx: {e}")
         try:
             with open(file_path, 'rb') as f:
-                content = f.read()
-                text = content.decode('utf-8', errors='ignore')
-                return text if text.strip() else None
+                return f.read().decode('utf-8', errors='ignore') or None
         except:
-            print(f"DOC file could not be processed")
             return None
 
+
 def extract_resume_text(file_path, filename):
-    """Extract text from resume file based on extension"""
     ext = filename.rsplit('.', 1)[1].lower()
     if ext == 'pdf':
         return extract_text_from_pdf(file_path)
@@ -119,232 +185,338 @@ def extract_resume_text(file_path, filename):
                 return f.read()
         except Exception as e:
             print(f"TXT read error: {e}")
-            return None
     return None
+
+
+# ─── Root / Health ────────────────────────────────────────────────────────────
 
 @app.route("/", methods=["GET"])
 def root():
-    """Root endpoint - API information"""
     return jsonify({
         "service": "PrepMate-AI Backend",
         "version": "1.0.0",
         "status": "running",
-        "environment": os.getenv('FLASK_ENV', 'development'),
-        "frontend": "https://prep-mate-ai-eight.vercel.app",
         "endpoints": {
-            "health": "/api/health",
+            "health":           "/api/health",
             "create_interview": "/api/create-interview",
-            "analyze_answer": "/api/analyze-answer",
-            "analyze_resume": "/api/analyze-resume",
-            "skill_gap": "/api/skill-gap"
-        },
-        "documentation": "Send POST request to /api/create-interview with job details"
+            "analyze_answer":   "/api/analyze-answer",
+            "batch_analyze":    "/api/batch-analyze-answers",
+            "analyze_resume":   "/api/analyze-resume",
+            "skill_gap":        "/api/skill-gap"
+        }
     }), 200
+
 
 @app.route("/api/health", methods=["GET"])
 def health_check():
-    """Health check endpoint"""
     return jsonify({
         "status": "healthy",
         "service": "PrepMate-AI Backend",
         "version": "1.0.0",
         "environment": os.getenv('FLASK_ENV', 'development'),
         "frontend": "https://prep-mate-ai-eight.vercel.app",
-        "backend": "https://prepmate-ai-backend-ckrb.onrender.com"
+        "backend":  "https://prepmate-ai-backend-ckrb.onrender.com"
     }), 200
 
-def clean_json_response(text):
-    """Extract JSON from markdown code blocks if present"""
-    text = re.sub(r'```json\s*', '', text)
-    text = re.sub(r'```\s*', '', text)
-    text = text.strip()
-    return text
+
+# ─── Create Interview ─────────────────────────────────────────────────────────
+#
+#  FIX: Now uses questionsCount, difficulty, focusAreas, and roundName that
+#  CreateInterview.js sends in step 3. These were silently ignored before.
 
 @app.route("/api/create-interview", methods=["POST"])
 def create_interview():
-    """Generate interview questions based on job description"""
     try:
         print("\n" + "=" * 60)
-        print("📨 INCOMING REQUEST")
+        print("📨 CREATE INTERVIEW REQUEST")
         print("=" * 60)
-        print(f"🌐 Origin: {request.headers.get('Origin', 'No origin header')}")
-        print(f"📍 Remote Address: {request.remote_addr}")
-        print(f"🔧 Method: {request.method}")
-        print(f"📦 Content-Type: {request.headers.get('Content-Type')}")
 
         data = request.json
         if not data:
-            print("❌ No JSON data received")
             return jsonify({"error": "No data provided"}), 400
 
-        print(f"📝 Job Title: {data.get('jobTitle', 'N/A')}")
-        print(f"👤 Experience: {data.get('experienceLevel', 'N/A')}")
-        print(f"🎯 Type: {data.get('interviewType', 'N/A')}")
-
         required_fields = ["jobTitle", "jobDescription", "experienceLevel", "interviewType"]
-        missing_fields = [field for field in required_fields if not data.get(field)]
+        missing_fields  = [f for f in required_fields if not data.get(f)]
         if missing_fields:
-            error_msg = f"Missing required fields: {', '.join(missing_fields)}"
-            print(f"❌ {error_msg}")
-            return jsonify({"error": error_msg}), 400
+            return jsonify({"error": f"Missing required fields: {', '.join(missing_fields)}"}), 400
 
-        print("=" * 60)
-        print(f"📝 Processing interview for: {data['jobTitle']}")
-        print(f"👤 Experience Level: {data['experienceLevel']}")
-        print(f"🎯 Interview Type: {data['interviewType']}")
-        print("=" * 60)
+        job_title        = data["jobTitle"]
+        job_description  = data["jobDescription"]
+        experience_level = data["experienceLevel"]
+        interview_type   = data["interviewType"]
 
-        print("\n🔍 Step 1: Extracting skills from job description...")
-        try:
-            skills_text = extract_skills(
-                data["jobTitle"], data["jobDescription"], data["experienceLevel"]
-            )
-            print(f"✅ Raw skills response received ({len(skills_text)} chars)")
-            print(f"📄 Skills response preview:\n{skills_text[:300]}...")
-        except Exception as e:
-            print(f"❌ Skills extraction failed: {str(e)}")
-            print(f"📚 Traceback:\n{traceback.format_exc()}")
-            return jsonify({"error": f"Failed to extract skills: {str(e)}"}), 500
+        # Preferences from CreateInterview step 3
+        questions_count = int(data.get("questionsCount", 5))
+        difficulty      = data.get("difficulty", "mixed")   # easy | mixed | hard
+        focus_areas     = data.get("focusAreas", [])        # list of strings
+        round_name      = data.get("roundName", "Interview Round")
 
-        skills_text = clean_json_response(skills_text)
-        try:
-            skills = json.loads(skills_text)
-            tech_count = len(skills.get('technicalSkills', []))
-            soft_count = len(skills.get('softSkills', []))
-            print(f"✅ Skills parsed: {tech_count} technical, {soft_count} soft skills")
-        except json.JSONDecodeError as e:
-            print(f"❌ Skills JSON parse error: {e}")
-            return jsonify({"error": "Failed to parse skills. The AI response was not valid JSON. Please try again."}), 500
+        print(f"📝 {job_title} | {experience_level} | {interview_type}")
+        print(f"🎯 Difficulty: {difficulty} | Questions: {questions_count} | Focus: {focus_areas}")
 
-        print(f"\n❓ Step 2: Generating {data['interviewType']} questions...")
-        try:
-            questions_text = generate_questions(
-                data["jobTitle"], data["jobDescription"], data["experienceLevel"],
-                data["interviewType"], json.dumps(skills)
-            )
-            print(f"✅ Raw questions response received ({len(questions_text)} chars)")
-            print(f"📄 Questions response preview:\n{questions_text[:500]}...")
-        except Exception as e:
-            print(f"❌ Question generation failed: {str(e)}")
-            return jsonify({"error": f"Failed to generate questions: {str(e)}"}), 500
+        # Step 1: Extract skills
+        skills_text = extract_skills(job_title, job_description[:2500], experience_level)
+        skills      = repair_json(clean_json_response(skills_text))
+        if not skills:
+            return jsonify({"error": "Failed to extract skills. Please try again."}), 500
 
-        questions_text = clean_json_response(questions_text)
-        try:
-            questions_data = json.loads(questions_text)
-            questions_list = questions_data.get("questions", [])
-            print(f"✅ Questions parsed: {len(questions_list)} questions generated")
-        except json.JSONDecodeError as e:
-            print(f"❌ Questions JSON parse error: {e}")
-            try:
-                json_match = re.search(r'\{.*\}', questions_text, re.DOTALL)
-                if json_match:
-                    questions_data = json.loads(json_match.group())
-                    questions_list = questions_data.get("questions", [])
-                    print(f"✅ Recovered with regex: {len(questions_list)} questions")
-                else:
-                    raise Exception("Could not extract JSON")
-            except:
-                return jsonify({"error": "Failed to parse questions. Please try again."}), 500
+        print(f"✅ Skills: {len(skills.get('technicalSkills', []))} tech, "
+              f"{len(skills.get('softSkills', []))} soft")
 
-        if not questions_list or len(questions_list) == 0:
-            return jsonify({"error": "AI generated no questions. Please try again."}), 500
+        # Step 2: Generate questions — inject difficulty + focus into context
+        difficulty_instruction = {
+            "easy":  "Ask foundational, entry-level questions only.",
+            "mixed": "Mix of beginner, intermediate, and one advanced question.",
+            "hard":  "Ask senior-level questions: complex system design, edge cases, tradeoffs.",
+        }.get(difficulty, "Mix of beginner, intermediate, and one advanced question.")
 
-        print("\n🎉 Interview created successfully!")
+        enriched_skills = json.dumps({
+            **skills,
+            "_difficulty":      difficulty_instruction,
+            "_focusAreas":      ", ".join(focus_areas[:6]) if focus_areas else "",
+            "_questionsCount":  questions_count,
+            "_roundName":       round_name,
+        })
+
+        questions_text = generate_questions(
+            job_title, job_description[:2000], experience_level,
+            interview_type, enriched_skills
+        )
+        questions_data = repair_json(clean_json_response(questions_text))
+        if not questions_data:
+            return jsonify({"error": "Failed to generate questions. Please try again."}), 500
+
+        questions_list = questions_data.get("questions", [])
+        # Trim to requested count
+        questions_list = questions_list[:questions_count]
+
+        if not questions_list:
+            return jsonify({"error": "No questions generated. Please try again."}), 500
+
+        print(f"✅ {len(questions_list)} questions for {round_name}")
         return jsonify({"skills": skills, "questions": questions_list}), 200
 
     except Exception as e:
-        print(f"\n❌ UNEXPECTED ERROR: {str(e)}")
+        print(f"\n❌ ERROR: {str(e)}")
         print(traceback.format_exc())
-        return jsonify({"error": f"Server error: {str(e)}", "type": type(e).__name__}), 500
+        return jsonify({"error": f"Server error: {str(e)}"}), 500
 
+
+# ─── Analyze Single Answer ────────────────────────────────────────────────────
+#
+#  FIX: Skipped answers return instantly without an AI call.
+#  FIX: Returns a graceful fallback (200) instead of 500 so Results.js
+#       never crashes mid-analysis — it just shows an estimated score.
 
 @app.route("/api/analyze-answer", methods=["POST"])
 def analyze_answer():
-    """Analyze a candidate's interview answer using Llama AI"""
     try:
-        print("\n" + "=" * 60)
-        print("📨 ANALYZE ANSWER REQUEST")
-        print("=" * 60)
-
         data = request.json
         if not data:
             return jsonify({"error": "No data provided"}), 400
 
-        question = data.get('question')
-        answer = data.get('answer')
+        question  = data.get('question', '')
+        answer    = data.get('answer', '')
         round_num = data.get('round')
-        job_title = data.get('jobTitle')
-        experience_level = data.get('experienceLevel')
+        job_title = data.get('jobTitle', '')
+        exp_level = data.get('experienceLevel', '')
 
-        if not all([question, answer, job_title, experience_level]):
-            missing = [k for k, v in {'question': question, 'answer': answer, 'jobTitle': job_title, 'experienceLevel': experience_level}.items() if not v]
-            return jsonify({"error": f"Missing required fields: {', '.join(missing)}"}), 400
+        # Return zeroed result for skipped answers without hitting the AI
+        if answer.strip() == "[Skipped]":
+            return jsonify({
+                "score": 0,
+                "feedback": ["Question was skipped."],
+                "strengths": [],
+                "improvements": ["Attempt all questions to receive full AI feedback."],
+                "hasExamples": False
+            }), 200
 
-        round_name = "Technical Round 1" if round_num == 1 else "Technical Round 2" if round_num == 2 else "HR Round"
+        round_name = {1: "Technical Round 1", 2: "Technical Round 2"}.get(round_num, "HR Round")
 
-        prompt = f"""You are an expert technical interviewer analyzing a candidate's response.
+        prompt = f"""You are an expert interviewer. Score this candidate answer.
 
-Interview Context:
-- Job Title: {job_title}
-- Experience Level: {experience_level}
-- Round: {round_name}
+Job: {job_title} ({exp_level}) — {round_name}
+Question: {question[:300]}
+Answer: {answer[:1200]}
 
-Question: {question}
-
-Candidate's Answer: {answer}
-
-Analyze this answer and provide:
-1. A score out of 10 (number between 0-10)
-2. 3-4 specific feedback points (mix of positive and constructive)
-3. 2-3 key strengths demonstrated
-4. 2-3 areas for improvement
-5. Whether the answer includes relevant examples/experience (true/false)
-
-Return ONLY valid JSON with this exact structure (no markdown, no code blocks):
+Return ONLY valid JSON (no markdown):
 {{
   "score": 7,
-  "feedback": ["Feedback point 1", "Feedback point 2", "Feedback point 3"],
+  "feedback": ["Specific point 1", "Specific point 2", "Specific point 3"],
   "strengths": ["Strength 1", "Strength 2"],
   "improvements": ["Improvement 1", "Improvement 2"],
   "hasExamples": true
 }}
 
-IMPORTANT: Return ONLY the JSON object, nothing else."""
+Rules: score is 0-10 integer, all arrays 2-3 items, return ONLY JSON."""
 
-        response_text = call_huggingface(prompt, max_tokens=1024)
-        cleaned_text = extract_json_from_text(response_text)
+        response_text = call_huggingface(prompt, max_tokens=600)
+        parsed        = repair_json(response_text)
 
-        try:
-            analysis = json.loads(cleaned_text)
-            required_keys = ["score", "feedback", "strengths", "improvements", "hasExamples"]
-            missing_keys = [key for key in required_keys if key not in analysis]
-            if missing_keys:
-                raise ValueError(f"Missing required keys: {', '.join(missing_keys)}")
+        if not parsed:
+            # Graceful word-count fallback so Results.js keeps going
+            wc = len(answer.split())
+            return jsonify({
+                "score":        min(3 + (wc // 20), 8),
+                "feedback":     ["AI scoring temporarily unavailable. Score estimated from answer length."],
+                "strengths":    ["Attempted the question"],
+                "improvements": ["Add concrete examples and quantify your results"],
+                "hasExamples":  False
+            }), 200
 
-            score = max(0, min(10, analysis.get('score', 5)))
-            result = {
-                "score": score,
-                "feedback": analysis.get('feedback', []),
-                "strengths": analysis.get('strengths', []),
-                "improvements": analysis.get('improvements', []),
-                "hasExamples": analysis.get('hasExamples', False)
-            }
-            print(f"✅ Analysis complete | Score: {score}/10")
-            return jsonify(result), 200
-
-        except (json.JSONDecodeError, ValueError) as e:
-            print(f"❌ JSON parse/validation error: {e}")
-            return jsonify({"error": "Failed to parse AI response. Please try again."}), 500
+        return jsonify({
+            "score":        max(0, min(10, int(parsed.get('score', 5)))),
+            "feedback":     parsed.get('feedback',     []),
+            "strengths":    parsed.get('strengths',    []),
+            "improvements": parsed.get('improvements', []),
+            "hasExamples":  bool(parsed.get('hasExamples', False))
+        }), 200
 
     except Exception as e:
-        print(f"\n❌ UNEXPECTED ERROR: {str(e)}")
-        print(traceback.format_exc())
-        return jsonify({"error": f"Server error: {str(e)}", "type": type(e).__name__}), 500
+        print(f"\n❌ ERROR: {str(e)}")
+        # 200 + fallback so Results.js doesn't stop
+        return jsonify({
+            "score": 5,
+            "feedback": ["Server error during analysis. Score is estimated."],
+            "strengths": [],
+            "improvements": ["Please retry for accurate scoring."],
+            "hasExamples": False
+        }), 200
 
+
+# ─── Batch Analyze Answers (NEW) ──────────────────────────────────────────────
+#
+#  Results.js previously called /analyze-answer once per question sequentially.
+#  For 3 rounds × 7 questions = 21 LLM calls chained = guaranteed timeout.
+#
+#  This endpoint takes ALL answers in one request and scores them in a SINGLE
+#  LLM call. One network round-trip, one model call, no timeout chain.
+#
+#  Results.js now calls this instead of looping over /analyze-answer.
+
+@app.route("/api/batch-analyze-answers", methods=["POST"])
+def batch_analyze_answers():
+    try:
+        print("\n" + "=" * 60)
+        print("📨 BATCH ANALYZE ANSWERS")
+        print("=" * 60)
+
+        data = request.json
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+
+        answers   = data.get('answers', [])
+        job_title = data.get('jobTitle', 'the role')
+        exp_level = data.get('experienceLevel', 'mid-level')
+
+        if not answers:
+            return jsonify({"error": "No answers provided"}), 400
+
+        real_answers = [a for a in answers if (a.get('answer') or '').strip() != '[Skipped]']
+        skipped_ids  = {a.get('questionId') for a in answers if (a.get('answer') or '').strip() == '[Skipped]'}
+
+        print(f"📝 {len(real_answers)} real answers | {len(skipped_ids)} skipped")
+
+        # Build compact answer block (300 chars per answer to control tokens)
+        answer_lines = []
+        for i, a in enumerate(real_answers):
+            q = (a.get('question') or '')[:150]
+            ans = (a.get('answer')   or '')[:300]
+            answer_lines.append(f"[{i+1}] Q: {q}\n    A: {ans}")
+
+        answers_block = "\n\n".join(answer_lines)
+
+        prompt = f"""You are an expert interviewer. Score ALL {len(real_answers)} answers for a {exp_level} {job_title} candidate.
+
+{answers_block}
+
+Return ONLY valid JSON (no markdown):
+{{
+  "results": [
+    {{
+      "index": 1,
+      "score": 7,
+      "feedback": ["Point 1", "Point 2"],
+      "strengths": ["Strength 1"],
+      "improvements": ["Improvement 1"],
+      "hasExamples": true
+    }}
+  ]
+}}
+
+Rules: one entry per answer in order, index starts at 1, score 0-10, return ONLY JSON."""
+
+        # ~130 output tokens per answer
+        max_tokens = min(200 + len(real_answers) * 130, 2400)
+
+        print(f"🤖 Batch scoring {len(real_answers)} answers (max_tokens={max_tokens})…")
+        response_text = call_huggingface(prompt, max_tokens=max_tokens)
+        print(f"📝 Response: {len(response_text)} chars")
+
+        parsed = repair_json(response_text)
+
+        results_map = {}
+
+        if parsed and 'results' in parsed:
+            ai_results = parsed['results']
+            for i, a in enumerate(real_answers):
+                ai = ai_results[i] if i < len(ai_results) else {}
+                results_map[a['questionId']] = {
+                    "score":        max(0, min(10, int(ai.get('score', 5)))),
+                    "feedback":     ai.get('feedback',     ["Answer recorded."]),
+                    "strengths":    ai.get('strengths',    ["Attempted the question"]),
+                    "improvements": ai.get('improvements', ["Add more specific examples"]),
+                    "hasExamples":  bool(ai.get('hasExamples', False)),
+                    "skipped":      False,
+                }
+        else:
+            # Word-count fallback for all real answers
+            print("⚠️  Batch parse failed — using word-count fallback")
+            for a in real_answers:
+                wc = len((a.get('answer') or '').split())
+                results_map[a['questionId']] = {
+                    "score":        min(3 + (wc // 25), 8),
+                    "feedback":     ["AI scoring temporarily unavailable. Score estimated."],
+                    "strengths":    ["Attempted the question"],
+                    "improvements": ["Add concrete examples and quantify results"],
+                    "hasExamples":  False,
+                    "skipped":      False,
+                }
+
+        # Fill skipped answers
+        for a in answers:
+            if a['questionId'] in skipped_ids:
+                results_map[a['questionId']] = {
+                    "score":        0,
+                    "feedback":     ["Question was skipped."],
+                    "strengths":    [],
+                    "improvements": ["Attempt all questions for full feedback."],
+                    "hasExamples":  False,
+                    "skipped":      True,
+                }
+
+        # Return in original input order
+        ordered = [
+            results_map.get(a['questionId'], {
+                "score": 5, "feedback": [], "strengths": [],
+                "improvements": [], "hasExamples": False, "skipped": False
+            })
+            for a in answers
+        ]
+
+        print(f"✅ Batch complete: {len(ordered)} results")
+        return jsonify({"results": ordered}), 200
+
+    except Exception as e:
+        print(f"\n❌ ERROR: {str(e)}")
+        print(traceback.format_exc())
+        return jsonify({"error": f"Server error: {str(e)}"}), 500
+
+
+# ─── Analyze Resume ───────────────────────────────────────────────────────────
 
 @app.route("/api/analyze-resume", methods=["POST"])
 def analyze_resume():
-    """Analyze a resume file and provide ATS score, feedback, and improvements"""
     try:
         print("\n" + "=" * 60)
         print("📨 ANALYZE RESUME REQUEST")
@@ -354,244 +526,190 @@ def analyze_resume():
             return jsonify({"error": "No file uploaded"}), 400
 
         file = request.files['resume']
-        if file.filename == '':
+        if not file.filename:
             return jsonify({"error": "No file selected"}), 400
         if not allowed_file(file.filename):
             return jsonify({"error": "Invalid file type. Please upload PDF, DOC, or DOCX"}), 400
 
-        filename = secure_filename(file.filename)
+        filename  = secure_filename(file.filename)
         file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(file_path)
 
         resume_text = extract_resume_text(file_path, filename)
-
         try:
             os.remove(file_path)
         except:
             pass
 
         if not resume_text or len(resume_text.strip()) < 100:
-            return jsonify({"error": "Failed to extract text from resume. Please ensure the file is not corrupted or password-protected."}), 400
+            return jsonify({"error": "Failed to extract text. Ensure the file is not password-protected."}), 400
 
-        print(f"✅ Text extracted successfully ({len(resume_text)} chars)")
+        print(f"✅ Extracted {len(resume_text)} chars")
 
-        prompt = f"""You are an expert ATS (Applicant Tracking System) and resume reviewer. Analyze the following resume comprehensively.
+        job_description      = request.form.get('jobDescription', '').strip()
+        resume_snippet       = resume_text[:3000]
+        resume_snippet_short = resume_text[:2500]
 
-RESUME TEXT:
-{resume_text[:4000]}
+        jd_block = (f"\nJOB DESCRIPTION:\n{job_description[:1500]}\n") if job_description else ""
 
-Provide a detailed analysis with:
+        # Call 1: Analysis JSON
+        analysis_prompt = f"""You are an expert ATS resume reviewer. Analyze this resume.
 
-1. ATS SCORE (0-100): Rate how well this resume would perform in applicant tracking systems
-2. SECTION FEEDBACK: Analyze each major section (Contact Info, Summary/Objective, Experience, Education, Skills) with:
-   - Section name
-   - Score out of 100
-   - Specific feedback
-3. KEYWORD GAPS: List 5-8 important industry keywords that are missing
-4. STRENGTHS: List 3-4 key strengths of this resume
-5. IMPROVEMENTS: List 3-4 specific areas that need improvement
-6. IMPROVED RESUME: Provide an enhanced version of the resume with better formatting and content
-
-Return ONLY valid JSON with this exact structure (no markdown, no code blocks):
+RESUME:
+{resume_snippet}
+{jd_block}
+Return ONLY this JSON (no markdown):
 {{
   "atsScore": 75,
   "sectionFeedback": [
-    {{
-      "section": "Contact Information",
-      "score": 85,
-      "feedback": "Contact details are clear and professional. Consider adding LinkedIn profile."
-    }},
-    {{
-      "section": "Professional Experience",
-      "score": 70,
-      "feedback": "Experience is relevant but lacks quantifiable achievements. Add metrics and numbers."
-    }}
+    {{"section": "Contact Information",  "score": 85, "feedback": "Clear contact. Add LinkedIn URL."}},
+    {{"section": "Professional Summary", "score": 70, "feedback": "Good but generic. Add keywords."}},
+    {{"section": "Work Experience",      "score": 72, "feedback": "Relevant but lacks metrics."}},
+    {{"section": "Education",            "score": 80, "feedback": "Clear and well-formatted."}},
+    {{"section": "Skills",              "score": 65, "feedback": "List not grouped. Separate technical from soft skills."}}
   ],
-  "keywordGaps": ["Project Management", "Agile", "Stakeholder Communication", "Data Analysis", "Python"],
-  "strengths": [
-    "Clear career progression with relevant experience",
-    "Strong educational background",
-    "Good technical skills section"
-  ],
-  "improvements": [
-    "Add quantifiable achievements (numbers, percentages, metrics)",
-    "Include more action verbs in bullet points",
-    "Expand on project outcomes and impact"
-  ],
-  "improvedResume": "IMPROVED RESUME TEXT HERE..."
+  "keywordGaps": ["Agile", "Stakeholder Management", "Data Analysis", "Python", "KPIs"],
+  "strengths": ["Clear career progression", "Relevant technical skills", "Good educational background"],
+  "improvements": ["Add quantifiable achievements", "Use stronger action verbs", "Expand skills section"]
 }}
 
-IMPORTANT: Return ONLY the JSON object, nothing else. Be specific and actionable in feedback."""
+Rules: atsScore 0-100, sectionFeedback 2-6 items, keywordGaps 5-8, strengths 3-4, improvements 3-5. Return ONLY JSON."""
 
-        response_text = call_huggingface(prompt, max_tokens=2048)
-        cleaned_text = extract_json_from_text(response_text)
-
-        try:
-            analysis = json.loads(cleaned_text)
-            required_keys = ["atsScore", "sectionFeedback", "keywordGaps", "strengths", "improvements"]
-            missing_keys = [key for key in required_keys if key not in analysis]
-            if missing_keys:
-                raise ValueError(f"Missing required keys: {', '.join(missing_keys)}")
-
-            ats_score = max(0, min(100, analysis.get('atsScore', 50)))
-            section_feedback = analysis.get('sectionFeedback', [])
-            for section in section_feedback:
-                if 'score' in section:
-                    section['score'] = max(0, min(100, section['score']))
-
-            result = {
-                "atsScore": ats_score,
-                "sectionFeedback": section_feedback,
-                "keywordGaps": analysis.get('keywordGaps', []),
-                "strengths": analysis.get('strengths', []),
-                "improvements": analysis.get('improvements', []),
-                "improvedResume": analysis.get('improvedResume', '')
-            }
-            print(f"✅ Resume analysis complete | ATS Score: {ats_score}/100")
-            return jsonify(result), 200
-
-        except (json.JSONDecodeError, ValueError) as e:
-            print(f"❌ JSON parse/validation error: {e}")
+        print("🤖 Call 1/2: Analysis JSON…")
+        r1      = call_huggingface(analysis_prompt, max_tokens=1200)
+        analysis = repair_json(r1)
+        if not analysis:
             return jsonify({"error": "Failed to parse AI analysis. Please try again."}), 500
 
+        defaults = {"atsScore": 50, "sectionFeedback": [], "keywordGaps": [], "strengths": [], "improvements": []}
+        for k in defaults:
+            if k not in analysis:
+                analysis[k] = defaults[k]
+
+        ats_score = max(0, min(100, int(analysis.get('atsScore', 50))))
+        for s in analysis.get('sectionFeedback', []):
+            if 'score' in s:
+                s['score'] = max(0, min(100, int(s['score'])))
+
+        print(f"✅ Call 1 done | ATS: {ats_score}")
+
+        # Call 2: Improved resume as plain text
+        improved_resume = ""
+        try:
+            improve_prompt = f"""Rewrite this resume in clean ATS-optimised plain text.
+
+RESUME:
+{resume_snippet_short}
+
+FIX THESE ISSUES:
+{chr(10).join('- ' + i for i in analysis.get('improvements', [])[:3])}
+
+ADD THESE KEYWORDS WHERE APPLICABLE:
+{', '.join(analysis.get('keywordGaps', [])[:5])}
+
+Rules: plain text only, standard headings (PROFESSIONAL SUMMARY / WORK EXPERIENCE / EDUCATION / SKILLS), action verbs, no invented info. Return ONLY the resume text."""
+
+            print("🤖 Call 2/2: Improved resume…")
+            improved_resume = call_huggingface(improve_prompt, max_tokens=1800)
+            improved_resume = re.sub(r'```[a-z]*\n?', '', improved_resume).strip()
+            print(f"✅ Call 2 done | {len(improved_resume)} chars")
+        except Exception as e:
+            print(f"⚠️  Call 2 failed (non-critical): {e}")
+
+        return jsonify({
+            "atsScore":        ats_score,
+            "sectionFeedback": analysis.get('sectionFeedback', []),
+            "keywordGaps":     analysis.get('keywordGaps', []),
+            "strengths":       analysis.get('strengths', []),
+            "improvements":    analysis.get('improvements', []),
+            "improvedResume":  improved_resume,
+        }), 200
+
     except Exception as e:
-        print(f"\n❌ UNEXPECTED ERROR: {str(e)}")
+        print(f"\n❌ ERROR: {str(e)}")
         print(traceback.format_exc())
-        return jsonify({"error": f"Server error: {str(e)}", "type": type(e).__name__}), 500
+        return jsonify({"error": f"Server error: {str(e)}"}), 500
 
 
-# ─────────────────────────────────────────────────────────────
-# MODULE 03 — Skill Gap & Roadmap
-# ─────────────────────────────────────────────────────────────
+# ─── Skill Gap ────────────────────────────────────────────────────────────────
+
 @app.route("/api/skill-gap", methods=["POST"])
 def skill_gap():
-    """
-    Compare a resume against a job description.
-    Returns: present skills, missing skills, match summary, and a personalized learning roadmap.
-    """
     try:
         print("\n" + "=" * 60)
         print("📨 SKILL GAP REQUEST")
         print("=" * 60)
-        print(f"🌐 Origin: {request.headers.get('Origin', 'No origin header')}")
 
-        # ── 1. Extract inputs ──────────────────────────────
         job_description = request.form.get('jobDescription', '').strip()
-
         if not job_description:
             return jsonify({"error": "Job description is required."}), 400
 
-        # Resume: file upload OR raw text in form field
         resume_text = ""
         if 'resume' in request.files:
             file = request.files['resume']
             if file and file.filename:
                 if not allowed_file(file.filename):
-                    return jsonify({"error": "Invalid file type. Please upload PDF, DOC, DOCX, or TXT."}), 400
-
-                filename = secure_filename(file.filename)
+                    return jsonify({"error": "Invalid file type."}), 400
+                filename  = secure_filename(file.filename)
                 file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
                 file.save(file_path)
-                print(f"📄 Resume file saved: {filename}")
-
                 resume_text = extract_resume_text(file_path, filename) or ""
-
                 try:
                     os.remove(file_path)
                 except:
                     pass
 
-        # Fallback: plain-text resume in form body
         if not resume_text:
             resume_text = request.form.get('resumeText', '').strip()
 
         if not resume_text or len(resume_text) < 50:
-            return jsonify({"error": "Could not extract resume text. Please try a different file or paste your resume text."}), 400
+            return jsonify({"error": "Could not extract resume text. Please try a different file."}), 400
 
-        print(f"✅ JD length: {len(job_description)} chars")
-        print(f"✅ Resume length: {len(resume_text)} chars")
+        print(f"✅ JD: {len(job_description)} | Resume: {len(resume_text)} chars")
 
-        # ── 2. Build prompt ────────────────────────────────
-        prompt = f"""You are an expert career coach and technical recruiter. Compare the resume against the job description below.
+        prompt = f"""You are an expert career coach. Compare the resume against the job description.
 
 JOB DESCRIPTION:
-{job_description[:3000]}
+{job_description[:2500]}
 
 RESUME:
-{resume_text[:3000]}
+{resume_text[:2500]}
 
-Perform a thorough skill gap analysis and return ONLY valid JSON with this exact structure (no markdown, no code blocks):
-
+Return ONLY valid JSON (no markdown):
 {{
-  "presentSkills": ["Skill A", "Skill B", "Skill C"],
-  "missingSkills": ["Skill X", "Skill Y", "Skill Z"],
+  "presentSkills": ["Skill A", "Skill B"],
+  "missingSkills": ["Skill X", "Skill Y"],
   "partialSkills": ["Skill P"],
-  "summary": "A 2-3 sentence summary of the candidate's fit for this role and the key gaps to address.",
+  "summary": "2-3 sentence summary of fit and key gaps.",
   "totalTimeframe": "10-14 weeks",
   "roadmap": [
     {{
       "skill": "Skill Name",
       "priority": "high",
       "timeframe": "2-3 weeks",
-      "matchScore": 15,
-      "description": "Why this skill is important for the role and how to acquire it.",
-      "resources": [
-        {{"name": "Resource Name", "url": "https://example.com"}},
-        {{"name": "Resource Name 2", "url": "https://example.com"}}
-      ],
-      "subtasks": [
-        "Complete the basics tutorial",
-        "Build a small project using this skill",
-        "Add it to your resume with a concrete example"
-      ]
+      "matchScore": 80,
+      "description": "Why this skill matters and how to learn it.",
+      "resources": [{{"name": "Resource", "url": "https://example.com"}}],
+      "subtasks": ["Task 1", "Task 2", "Task 3"]
     }}
   ]
 }}
 
-Rules:
-- presentSkills: skills clearly mentioned or demonstrated in the resume that match the JD
-- missingSkills: skills required by the JD that are NOT in the resume
-- partialSkills: skills partially present (mentioned but not demonstrated)
-- roadmap: only include missing or partial skills, ordered by priority (high → medium → low)
-- matchScore in roadmap: how often this skill appears in the JD (0-100)
-- priority: "high", "medium", or "low"
-- resources: real, free, widely known resources (Coursera, YouTube, official docs, freeCodeCamp, etc.)
-- Return 5-8 roadmap items maximum
-- Return ONLY the JSON object, nothing else."""
+Rules: roadmap max 6 items, priority = high/medium/low, return ONLY JSON."""
 
-        # ── 3. Call AI ─────────────────────────────────────
-        print("\n🤖 Calling Llama AI for skill gap analysis...")
-        response_text = call_huggingface(prompt, max_tokens=2048)
-        print(f"✅ AI response received ({len(response_text)} chars)")
-        print(f"📄 Response preview:\n{response_text[:400]}...")
+        print("🤖 Skill gap AI call…")
+        response_text = call_huggingface(prompt, max_tokens=2000)
+        analysis = repair_json(response_text)
+        if not analysis:
+            return jsonify({"error": "Failed to parse AI response. Please try again."}), 500
 
-        # ── 4. Parse response ──────────────────────────────
-        cleaned_text = extract_json_from_text(response_text)
-
-        try:
-            analysis = json.loads(cleaned_text)
-        except json.JSONDecodeError:
-            # Regex fallback
-            try:
-                json_match = re.search(r'\{.*\}', cleaned_text, re.DOTALL)
-                if json_match:
-                    analysis = json.loads(json_match.group())
-                else:
-                    raise Exception("Could not find JSON in response")
-            except Exception as parse_err:
-                print(f"❌ JSON parse failed: {parse_err}")
-                return jsonify({"error": "Failed to parse AI response. Please try again."}), 500
-
-        # ── 5. Validate & sanitize ─────────────────────────
         required_keys = ["presentSkills", "missingSkills", "roadmap"]
-        missing_keys = [k for k in required_keys if k not in analysis]
+        missing_keys  = [k for k in required_keys if k not in analysis]
         if missing_keys:
-            return jsonify({"error": f"Incomplete AI response (missing: {', '.join(missing_keys)}). Please try again."}), 500
+            return jsonify({"error": f"Incomplete AI response (missing: {', '.join(missing_keys)})."}), 500
 
-        # Sanitize roadmap priorities
-        valid_priorities = {"high", "medium", "low"}
         for item in analysis.get("roadmap", []):
-            if item.get("priority") not in valid_priorities:
+            if item.get("priority") not in {"high", "medium", "low"}:
                 item["priority"] = "medium"
             if "matchScore" in item:
                 item["matchScore"] = max(0, min(100, int(item["matchScore"])))
@@ -604,35 +722,27 @@ Rules:
             "totalTimeframe": analysis.get("totalTimeframe", ""),
             "roadmap":        analysis.get("roadmap", [])
         }
-
-        print(f"✅ Skill gap analysis complete")
-        print(f"📤 SENDING RESPONSE:")
-        print(f"   - Present skills:  {len(result['presentSkills'])}")
-        print(f"   - Missing skills:  {len(result['missingSkills'])}")
-        print(f"   - Partial skills:  {len(result['partialSkills'])}")
-        print(f"   - Roadmap items:   {len(result['roadmap'])}")
-        print("=" * 60 + "\n")
-
+        print(f"✅ Skill gap done | Present: {len(result['presentSkills'])} | "
+              f"Missing: {len(result['missingSkills'])} | Roadmap: {len(result['roadmap'])}")
         return jsonify(result), 200
 
     except Exception as e:
-        print(f"\n❌ UNEXPECTED ERROR: {str(e)}")
+        print(f"\n❌ ERROR: {str(e)}")
         print(traceback.format_exc())
-        return jsonify({"error": f"Server error: {str(e)}", "type": type(e).__name__}), 500
+        return jsonify({"error": f"Server error: {str(e)}"}), 500
 
+
+# ─── Error Handlers ───────────────────────────────────────────────────────────
 
 @app.errorhandler(404)
 def not_found(error):
     return jsonify({
         "error": "Endpoint not found",
-        "available_endpoints": {
-            "root": "GET /",
-            "health": "GET /api/health",
-            "create_interview": "POST /api/create-interview",
-            "analyze_answer": "POST /api/analyze-answer",
-            "analyze_resume": "POST /api/analyze-resume",
-            "skill_gap": "POST /api/skill-gap"
-        }
+        "available_endpoints": [
+            "/api/health", "/api/create-interview",
+            "/api/analyze-answer", "/api/batch-analyze-answers",
+            "/api/analyze-resume", "/api/skill-gap"
+        ]
     }), 404
 
 @app.errorhandler(500)
@@ -644,25 +754,10 @@ def file_too_large(error):
     return jsonify({"error": "File too large. Maximum size is 5MB."}), 413
 
 
+# ─── Entry Point ──────────────────────────────────────────────────────────────
+
 if __name__ == "__main__":
     port = int(os.getenv('PORT', 5000))
-    env = os.getenv('FLASK_ENV', 'development')
-
-    print("\n" + "=" * 60)
-    print("🚀 PREPMATE-AI BACKEND STARTING...")
-    print("=" * 60)
-    print(f"🌍 Environment: {env}")
-    print(f"📡 API Server: http://localhost:{port}")
-    print(f"🏥 Health Check: http://localhost:{port}/api/health")
-    print(f"🎯 Create Interview: POST http://localhost:{port}/api/create-interview")
-    print(f"🔍 Analyze Answer: POST http://localhost:{port}/api/analyze-answer")
-    print(f"📄 Analyze Resume: POST http://localhost:{port}/api/analyze-resume")
-    print(f"🗺️  Skill Gap:      POST http://localhost:{port}/api/skill-gap")
-    print("🤖 AI Model: Llama 3.1 8B (Hugging Face)")
-    print("🌐 CORS: Enabled for Vercel + localhost + Render")
-    print("🌍 Frontend: https://prep-mate-ai-eight.vercel.app")
-    print("🖥️  Backend: https://prepmate-ai-backend-ckrb.onrender.com")
-    print("=" * 60 + "\n")
-    print("✅ Ready to accept requests!\n")
-
+    env  = os.getenv('FLASK_ENV', 'development')
+    print(f"\n🚀 PrepMate-AI Backend | Port {port} | Env {env}\n")
     app.run(debug=(env == 'development'), port=port, host='0.0.0.0')

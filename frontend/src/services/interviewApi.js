@@ -12,229 +12,214 @@ const API_BASE_URL = `${getAPIUrl()}/api`;
 console.log("🌐 API Base URL:", API_BASE_URL);
 
 /**
- * Create a new interview session
- * @param {Object} formData - Interview creation data
- * @returns {Promise<Object>} Interview session with skills and questions
+ * Create a new interview session.
+ * Now passes questionsCount, difficulty, focusAreas, and roundName
+ * so the backend can tailor questions to the user's step-3 preferences.
  */
 export const createInterviewSession = async (formData) => {
   try {
-    console.log("🚀 Calling Backend API:", `${API_BASE_URL}/create-interview`);
-    console.log("📦 Request payload:", {
-      jobTitle: formData.jobTitle,
-      jobDescription: formData.jobDescription?.substring(0, 100) + "...",
-      experienceLevel: formData.experienceLevel,
-      interviewType: formData.interviewType,
-    });
-    
-    // Add timeout for slow Render cold starts (90 seconds)
+    console.log("🚀 createInterviewSession →", `${API_BASE_URL}/create-interview`);
+
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 90000);
-    
+    const timeoutId  = setTimeout(() => controller.abort(), 90000);
+
     const response = await fetch(`${API_BASE_URL}/create-interview`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        jobTitle: formData.jobTitle,
-        jobDescription: formData.jobDescription,
+        jobTitle:        formData.jobTitle,
+        jobDescription:  formData.jobDescription,
         experienceLevel: formData.experienceLevel,
-        interviewType: formData.interviewType,
-        industry: formData.industry || ""
+        interviewType:   formData.interviewType,
+        industry:        formData.industry        || "",
+        // Step-3 preferences — previously sent but ignored by backend
+        questionsCount:  formData.questionsCount  || 5,
+        difficulty:      formData.difficulty      || "mixed",
+        focusAreas:      formData.focusAreas      || [],
+        roundName:       formData.roundName       || "Interview Round",
       }),
-      signal: controller.signal
+      signal: controller.signal,
     });
 
     clearTimeout(timeoutId);
 
-    // Log response details
-    console.log("📡 Response status:", response.status);
-    console.log("📡 Response headers:", Object.fromEntries(response.headers.entries()));
-
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
-      console.error("❌ Server error response:", errorData);
-      throw new Error(errorData.error || `Server error: ${response.status}`);
+      const err = await response.json().catch(() => ({ error: "Unknown error" }));
+      throw new Error(err.error || `Server error: ${response.status}`);
     }
 
     const data = await response.json();
-    console.log("✅ Interview generated successfully");
-    console.log("📊 Skills count:", data.skills?.technicalSkills?.length || 0);
-    console.log("❓ Questions count:", data.questions?.length || 0);
-    
-    // Validate response structure
-    if (!data.skills || !data.questions) {
-      throw new Error("Invalid response structure from server");
+    console.log("✅ Questions:", data.questions?.length);
+
+    if (!data.skills || !data.questions?.length) {
+      throw new Error("Invalid response from server. Please try again.");
     }
-    
-    if (data.questions.length === 0) {
-      throw new Error("No questions were generated. Please try again.");
-    }
-    
-    return data; // { skills, questions }
-    
+
+    return data;
+
   } catch (error) {
-    console.error("❌ API Error:", error);
-    
-    // Better error messages based on error type
     if (error.name === 'AbortError') {
       throw new Error(
-        "Request timed out after 90 seconds. " +
-        "This usually happens when Render's free tier is sleeping (cold start). " +
-        "Please wait a moment and try again."
+        "Request timed out (90 s). Render's free tier may be waking up — " +
+        "please wait a moment and try again."
       );
     }
-    
     if (error.message.includes("Failed to fetch") || error.message.includes("NetworkError")) {
       throw new Error(
-        "❌ Cannot connect to backend server.\n\n" +
-        "Please check:\n" +
-        "1. Backend is running on Render: https://prepmate-ai-backend-ckrb.onrender.com\n" +
-        "2. Check Render dashboard for service status\n" +
-        "3. Try refreshing the page\n\n" +
-        "If the problem persists, the backend may be sleeping (Render free tier). " +
-        "Visit the backend URL to wake it up, then try again."
+        "Cannot connect to the backend. Please check your internet connection " +
+        "or visit https://prepmate-ai-backend-ckrb.onrender.com to wake the server."
       );
     }
-    
-    if (error.message.includes("CORS")) {
-      throw new Error(
-        "CORS error: Backend is blocking requests from this domain. " +
-        "Please check CORS configuration in backend app.py"
-      );
-    }
-    
     throw error;
   }
 };
 
+
 /**
- * Analyze interview answer using AI
- * @param {Object} answerData - Answer data to analyze
- * @param {Object} interviewContext - Interview context (job title, experience level, etc.)
- * @returns {Promise<Object>} Analysis results with score and feedback
+ * Analyze a single interview answer.
+ * Used as a fallback if the batch endpoint is unavailable.
  */
 export const analyzeAnswer = async (answerData, interviewContext) => {
   try {
-    console.log("🔍 Analyzing answer with AI...");
-    console.log("📝 Question:", answerData.question?.substring(0, 60) + "...");
-    console.log("💬 Answer length:", answerData.answer?.length, "characters");
-    
-    // Add timeout (60 seconds)
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 60000);
-    
+    const timeoutId  = setTimeout(() => controller.abort(), 60000);
+
     const response = await fetch(`${API_BASE_URL}/analyze-answer`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        question: answerData.question,
-        answer: answerData.answer,
-        round: answerData.round,
-        jobTitle: interviewContext.jobTitle,
-        experienceLevel: interviewContext.experienceLevel
+        question:        answerData.question,
+        answer:          answerData.answer,
+        round:           answerData.round,
+        jobTitle:        interviewContext.jobTitle,
+        experienceLevel: interviewContext.experienceLevel,
       }),
-      signal: controller.signal
+      signal: controller.signal,
     });
 
     clearTimeout(timeoutId);
 
-    console.log("📡 Analysis response status:", response.status);
-
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
-      console.error("❌ Analysis error response:", errorData);
-      throw new Error(errorData.error || `Server error: ${response.status}`);
+      const err = await response.json().catch(() => ({ error: "Unknown error" }));
+      throw new Error(err.error || `Server error: ${response.status}`);
     }
 
     const data = await response.json();
-    console.log("✅ Analysis complete");
-    console.log("📊 Score:", data.score);
-    console.log("💡 Feedback points:", data.feedback?.length || 0);
-    
-    // Validate response structure
-    if (typeof data.score !== 'number') {
-      console.warn("⚠️ Invalid score, using default");
-      data.score = 5;
-    }
-    
     return {
-      score: data.score || 5,
-      feedback: data.feedback || [],
-      strengths: data.strengths || [],
+      score:        typeof data.score === 'number' ? data.score : 5,
+      feedback:     data.feedback     || [],
+      strengths:    data.strengths    || [],
       improvements: data.improvements || [],
-      hasExamples: data.hasExamples || false
+      hasExamples:  data.hasExamples  || false,
     };
-    
+
   } catch (error) {
-    console.error("❌ Analysis Error:", error);
-    
     if (error.name === 'AbortError') {
-      throw new Error("Analysis timed out after 60 seconds. Please try again.");
+      throw new Error("Analysis timed out. Please try again.");
     }
-    
-    if (error.message.includes("Failed to fetch")) {
-      throw new Error("Cannot connect to backend for analysis. Please check your connection.");
-    }
-    
-    throw error;
+    // Return a safe fallback so Results.js doesn't crash
+    const wc = (answerData.answer || '').split(/\s+/).length;
+    return {
+      score:        Math.min(3 + Math.floor(wc / 20), 8),
+      feedback:     ["AI scoring unavailable. Score estimated from answer length."],
+      strengths:    ["Attempted the question"],
+      improvements: ["Add concrete examples and quantify your results"],
+      hasExamples:  false,
+    };
   }
 };
 
+
 /**
- * Test backend connection
- * @returns {Promise<boolean>}
+ * Batch analyze ALL interview answers in a single API call.
+ *
+ * WHY: Results.js previously called analyzeAnswer() once per question
+ * sequentially — 21 calls for a 3-round × 7Q interview. That chains
+ * 21 LLM calls and reliably times out on Render's free tier.
+ *
+ * This sends everything in one request → one LLM call → one response.
+ *
+ * @param {Array}  answers          - Full answers array from localStorage
+ * @param {string} jobTitle
+ * @param {string} experienceLevel
+ * @returns {Promise<Array>}        - Ordered array of analysis results
  */
+export const batchAnalyzeAnswers = async (answers, jobTitle, experienceLevel) => {
+  try {
+    console.log(`🔍 Batch analyzing ${answers.length} answers…`);
+
+    const controller = new AbortController();
+    // Allow up to 120 s — one big call beats 21 small ones even if it's slower
+    const timeoutId  = setTimeout(() => controller.abort(), 120000);
+
+    const response = await fetch(`${API_BASE_URL}/batch-analyze-answers`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ answers, jobTitle, experienceLevel }),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({ error: "Unknown" }));
+      throw new Error(err.error || `Server error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log(`✅ Batch analysis: ${data.results?.length} results`);
+    return data.results || [];
+
+  } catch (error) {
+    console.error("❌ Batch analyze failed:", error.message);
+
+    if (error.name === 'AbortError') {
+      console.warn("⏳ Batch timed out — falling back to word-count estimates");
+    }
+
+    // Client-side fallback: estimate every answer from word count
+    // so Results.js always has something to show
+    return answers.map(a => {
+      const skipped = (a.answer || '').trim() === '[Skipped]';
+      const wc      = skipped ? 0 : (a.answer || '').split(/\s+/).length;
+      return {
+        score:        skipped ? 0 : Math.min(3 + Math.floor(wc / 20), 8),
+        feedback:     skipped
+          ? ["Question was skipped."]
+          : ["AI scoring unavailable. Score estimated from answer length."],
+        strengths:    skipped ? [] : ["Attempted the question"],
+        improvements: skipped
+          ? ["Attempt all questions for full feedback."]
+          : ["Add concrete examples and quantify your results"],
+        hasExamples:  false,
+        skipped,
+      };
+    });
+  }
+};
+
+
+/** Test backend reachability */
 export const testBackendConnection = async () => {
   try {
-    console.log("🏥 Testing backend connection:", `${API_BASE_URL}/health`);
-    
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 seconds
-    
-    const response = await fetch(`${API_BASE_URL}/health`, {
-      method: "GET",
-      signal: controller.signal
-    });
-    
+    const timeoutId  = setTimeout(() => controller.abort(), 10000);
+    const response   = await fetch(`${API_BASE_URL}/health`, { signal: controller.signal });
     clearTimeout(timeoutId);
-    
-    const isHealthy = response.ok;
-    console.log(isHealthy ? "✅ Backend is healthy" : "❌ Backend is not responding");
-    
-    if (isHealthy) {
-      const data = await response.json();
-      console.log("📊 Backend info:", data);
-    }
-    
-    return isHealthy;
-  } catch (error) {
-    console.error("❌ Backend not reachable:", error.message);
+    return response.ok;
+  } catch {
     return false;
   }
 };
 
-/**
- * Get backend health info
- * @returns {Promise<Object|null>}
- */
+/** Get backend health details */
 export const getBackendHealth = async () => {
   try {
-    const response = await fetch(`${API_BASE_URL}/health`, {
-      method: "GET",
-    });
-    
-    if (response.ok) {
-      return await response.json();
-    }
-    return null;
-  } catch (error) {
-    console.error("Cannot fetch backend health:", error);
+    const response = await fetch(`${API_BASE_URL}/health`);
+    return response.ok ? await response.json() : null;
+  } catch {
     return null;
   }
 };
 
-// Export API_BASE_URL for debugging
 export { API_BASE_URL };
