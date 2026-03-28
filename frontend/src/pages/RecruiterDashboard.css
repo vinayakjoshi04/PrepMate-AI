@@ -1763,3 +1763,161 @@
   .chat-overlay { padding: 0; }
   .invites-strip-job { max-width: 130px; }
 }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Append to RecruiterDashboard.css
+   Applicant cards inside the ApplicantsDrawer
+   ───────────────────────────────────────────────────────────────────────────── */
+
+/* Wider drawer for applicants list */
+.rd-drawer-wide {
+  max-width: 560px !important;
+}
+
+/* ─── Applicant Card ─────────────────────────────────────────────────────────── */
+.appl-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 14px;
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: all 0.2s ease;
+}
+.appl-card:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(102, 126, 234, 0.22);
+}
+
+/* Top row: avatar + name + status */
+.appl-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.appl-card-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+.appl-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: #fff;
+  font-family: 'Inter', sans-serif;
+  margin-bottom: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.appl-meta {
+  font-size: 12px;
+  color: #718096;
+  font-family: 'Inter', sans-serif;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.appl-sep { color: #2d2d4a; }
+
+.appl-card-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 5px;
+  flex-shrink: 0;
+}
+.appl-status-badge {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-family: 'Inter', sans-serif;
+  white-space: nowrap;
+}
+.appl-date {
+  font-size: 11px;
+  color: #4a4a6a;
+  font-family: 'Inter', sans-serif;
+}
+
+/* Skills row */
+.appl-skills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* Info chips (location, email) */
+.appl-info-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.appl-info-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: #718096;
+  font-family: 'Inter', sans-serif;
+}
+.appl-info-chip svg {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+}
+
+/* Actions row */
+.appl-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-top: 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Status dropdown */
+.appl-status-select {
+  padding: 7px 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  color: #a0aec0;
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  outline: none;
+  appearance: none;
+  transition: border-color 0.2s ease;
+  min-width: 110px;
+}
+.appl-status-select:focus {
+  border-color: rgba(102, 126, 234, 0.5);
+}
+.appl-status-select option {
+  background: #1a1a2e;
+}
+
+/* ─── Responsive ──────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .rd-drawer-wide { max-width: 100vw !important; }
+  .appl-actions { flex-direction: column; align-items: flex-start; }
+  .appl-status-select { width: 100%; }
+}
+
+.jb-apply-btn-done {
+  background: rgba(67, 233, 123, 0.15) !important;
+  box-shadow: none !important;
+  color: #86efac !important;
+  cursor: default;
+}

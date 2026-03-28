@@ -469,7 +469,7 @@ function InvitesPanel({ invites, loading, onOpenChat, onDecline }) {
   );
 }
 
-function JobBoardSection({ jobs, loading, onApply }) {
+function JobBoardSection({ jobs, loading, onApply, appliedJobIds = [] }) {
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [expanded, setExpanded] = useState(null);
@@ -616,20 +616,113 @@ function JobBoardSection({ jobs, loading, onApply }) {
                     h("span", { className: "jb-type-badge" }, job.type || "Full-time")
                   ),
                   h("button", {
-                    className: "jb-apply-btn",
-                    onClick: () => onApply(job),
+                    className: `jb-apply-btn ${appliedJobIds.includes(job.id) ? "jb-apply-btn-done" : ""}`,
+                    onClick: () => !appliedJobIds.includes(job.id) && onApply(job),
+                    disabled: appliedJobIds.includes(job.id),
                   },
-                    h("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", width: "16", height: "16" },
-                      h("line", { x1: "22", y1: "2", x2: "11", y2: "13" }),
-                      h("polygon", { points: "22 2 15 22 11 13 2 9 22 2" })
-                    ),
-                    "Express Interest"
+                    appliedJobIds.includes(job.id)
+                      ? "✓ Applied"
+                      : h("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", width: "16", height: "16" },
+                          h("line", { x1: "22", y1: "2", x2: "11", y2: "13" }),
+                          h("polygon", { points: "22 2 15 22 11 13 2 9 22 2" })
+                        ),
+                    appliedJobIds.includes(job.id) ? null : "Express Interest"
                   )
                 )
               )
             )
           )
         )
+  );
+}
+
+/* ─── Shortlist Celebration Modal ───────────────────── */
+function ShortlistCelebrationModal({ data, onClose }) {
+  return h("div", {
+    className: "ru-overlay",
+    onClick: onClose,
+    style: { zIndex: 600 }
+  },
+    h("div", {
+      className: "ru-modal",
+      onClick: e => e.stopPropagation(),
+      style: { maxWidth: 500, textAlign: "center" }
+    },
+      h("div", { className: "ru-done-state", style: { padding: "48px 36px", gap: 20 } },
+        // Animated stars
+        h("div", { style: { fontSize: 56, lineHeight: 1 } }, "🎉"),
+        h("div", {
+          style: {
+            width: 80, height: 80,
+            background: "linear-gradient(135deg, rgba(67,233,123,0.2), rgba(67,233,123,0.05))",
+            border: "2px solid rgba(67,233,123,0.5)",
+            borderRadius: "50%",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 36, margin: "0 auto",
+          }
+        }, "⭐"),
+        h("div", null,
+          h("h2", {
+            style: {
+              fontSize: 26, fontWeight: 900, color: "#fff",
+              letterSpacing: "-0.5px", marginBottom: 10,
+              fontFamily: "Inter, sans-serif",
+              background: "linear-gradient(135deg, #43e97b, #38f9d7)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              backgroundClip: "text",
+            }
+          }, "You've Been Shortlisted!"),
+          h("p", {
+            style: {
+              fontSize: 16, color: "#a0aec0",
+              fontFamily: "Inter, sans-serif",
+              lineHeight: 1.6, marginBottom: 8,
+            }
+          },
+            "Congratulations! A recruiter has shortlisted you for "
+          ),
+          h("p", {
+            style: {
+              fontSize: 18, fontWeight: 700, color: "#fff",
+              fontFamily: "Inter, sans-serif", marginBottom: 16,
+            }
+          }, `"${data.jobTitle}"`),
+          h("p", {
+            style: {
+              fontSize: 14, color: "#718096",
+              fontFamily: "Inter, sans-serif", lineHeight: 1.6,
+            }
+          },
+            "Check your Interview Invites for a message from the recruiter. They may be reaching out to schedule your next steps."
+          )
+        ),
+        h("div", {
+          style: {
+            background: "rgba(67,233,123,0.06)",
+            border: "1px solid rgba(67,233,123,0.2)",
+            borderRadius: 12, padding: "14px 20px",
+            width: "100%",
+          }
+        },
+          h("div", {
+            style: { fontSize: 12, color: "#43e97b", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: 4, fontFamily: "Inter, sans-serif" }
+          }, "What's next?"),
+          h("div", {
+            style: { fontSize: 14, color: "#a0aec0", fontFamily: "Inter, sans-serif" }
+          }, "Watch for a message in your Invites tab. The recruiter will contact you to discuss next steps.")
+        ),
+        h("button", {
+          className: "module-cta",
+          style: {
+            background: "linear-gradient(135deg, #43e97b, #38f9d7)",
+            boxShadow: "0 10px 30px rgba(67,233,123,0.3)",
+            width: "100%", marginTop: 4,
+          },
+          onClick: onClose,
+        }, "🎊 Amazing! Close")
+      )
+    )
   );
 }
 
@@ -652,6 +745,8 @@ export default function Dashboard() {
   const [jobsLoading, setJobsLoading] = useState(false);
   const [showJobBoard, setShowJobBoard] = useState(false);
   const [applyToast, setApplyToast] = useState(null);
+  const [appliedJobIds, setAppliedJobIds] = useState([]);
+  const [shortlistCelebration, setShortlistCelebration] = useState(null);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -660,6 +755,7 @@ export default function Dashboard() {
         fetchMyResume(user.id);
         fetchMyInvites(user.id);
         fetchJobs();
+        fetchMyApplications(user.id);
       }
     });
   }, []);
@@ -694,6 +790,15 @@ export default function Dashboard() {
     setJobsLoading(false);
   };
 
+  const fetchMyApplications = async (uid) => {
+    if (!uid) return;
+    const { data } = await supabase
+      .from("applications")
+      .select("job_post_id")
+      .eq("candidate_id", uid);
+    if (data) setAppliedJobIds(data.map(a => a.job_post_id));
+  };
+
   // Real-time: new invites for this candidate
   useEffect(() => {
     if (!user) return;
@@ -712,6 +817,69 @@ export default function Dashboard() {
     return () => supabase.removeChannel(channel);
   }, [user]);
 
+  // Real-time: watch for shortlist via new invite INSERT (more reliable)
+  useEffect(() => {
+    if (!user) return;
+
+    // Poll every 8 seconds as fallback for realtime
+    const pollInterval = setInterval(async () => {
+      const { data } = await supabase
+        .from("applications")
+        .select("*, job_posts(title)")
+        .eq("candidate_id", user.id)
+        .eq("status", "shortlisted");
+      
+      if (data && data.length > 0) {
+        const latest = data[data.length - 1];
+        // Only show if we haven't shown it already (track in sessionStorage)
+        const shownKey = `shortlist_shown_${latest.id}`;
+        if (!sessionStorage.getItem(shownKey)) {
+          sessionStorage.setItem(shownKey, "true");
+          setShortlistCelebration({
+            jobTitle: latest.job_posts?.title || "a position",
+            jobPostId: latest.job_post_id,
+          });
+        }
+      }
+    }, 8000);
+
+    // Also keep realtime as primary (no filter — more reliable)
+    const channel = supabase
+      .channel(`applications-watch:${user.id}`)
+      .on("postgres_changes", {
+        event: "UPDATE",
+        schema: "public",
+        table: "applications",
+      }, (payload) => {
+        if (
+          payload.new.candidate_id === user.id &&
+          payload.new.status === "shortlisted"
+        ) {
+          const shownKey = `shortlist_shown_${payload.new.id}`;
+          if (!sessionStorage.getItem(shownKey)) {
+            sessionStorage.setItem(shownKey, "true");
+            supabase
+              .from("job_posts")
+              .select("title")
+              .eq("id", payload.new.job_post_id)
+              .maybeSingle()
+              .then(({ data: job }) => {
+                setShortlistCelebration({
+                  jobTitle: job?.title || "a position",
+                  jobPostId: payload.new.job_post_id,
+                });
+              });
+          }
+        }
+      })
+      .subscribe();
+
+    return () => {
+      clearInterval(pollInterval);
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
+
   const handleDeclineInvite = async (inviteId) => {
     await supabase.from("interview_invites")
       .update({ status: "declined" })
@@ -727,8 +895,39 @@ export default function Dashboard() {
     }
   };
 
-  const handleApply = (job) => {
-    setApplyToast(`Interest sent for "${job.title}"! The recruiter will be notified.`);
+  const handleApply = async (job) => {
+    if (!user) return;
+    const { data: resume } = await supabase
+      .from("resumes")
+      .select("*")
+      .eq("candidate_id", user.id)
+      .maybeSingle();
+
+    const { error } = await supabase.from("applications").insert({
+      job_post_id:     job.id,
+      candidate_id:    user.id,
+      candidate_name:  resume?.candidate_name  || user.user_metadata?.full_name || user.email.split("@")[0],
+      candidate_email: user.email,
+      resume_url:      resume?.resume_url      || null,
+      resume_filename: resume?.resume_filename || null,
+      skills:          resume?.skills          || [],
+      experience:      resume?.experience      || null,
+      college:         resume?.college         || null,
+      location:        resume?.location        || null,
+      role:            resume?.role            || null,
+      status:          "new",
+    });
+
+    if (error) {
+      if (error.code === "23505") {
+        setApplyToast(`You've already applied for "${job.title}".`);
+      } else {
+        setApplyToast(`Something went wrong. Please try again.`);
+      }
+    } else {
+      setAppliedJobIds(prev => [...prev, job.id]);
+      setApplyToast(`Interest sent for "${job.title}"! The recruiter will be notified.`);
+    }
     setTimeout(() => setApplyToast(null), 3500);
   };
 
@@ -1153,6 +1352,7 @@ export default function Dashboard() {
             jobs,
             loading: jobsLoading,
             onApply: handleApply,
+            appliedJobIds,
           })
         )
       )
@@ -1168,6 +1368,12 @@ export default function Dashboard() {
       user,
       onClose: () => setShowResumeModal(false),
       onSuccess: () => user && fetchMyResume(user.id),
+    }),
+
+    // Shortlist Celebration
+    shortlistCelebration && h(ShortlistCelebrationModal, {
+      data: shortlistCelebration,
+      onClose: () => setShortlistCelebration(null),
     }),
 
     // NEW: Chat Modal

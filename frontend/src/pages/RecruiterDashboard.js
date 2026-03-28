@@ -281,6 +281,192 @@ function RecruiterChatModal({ invite, user, onClose }) {
   );
 }
 
+/* ─── Applicants Drawer ──────────────────────────────── */
+function ApplicantsDrawer({ post, onClose, onInvite, onStatusChange }) {
+  const [applicants, setApplicants] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [resumeUrls, setResumeUrls] = useState({});
+
+  useEffect(() => {
+    if (!post) return;
+    fetchApplicants();
+  }, [post?.id]);
+
+  const fetchApplicants = async () => {
+    setLoading(true);
+    const { data } = await supabase
+      .from("applications")
+      .select("*")
+      .eq("job_post_id", post.id)
+      .order("created_at", { ascending: false });
+    if (data) {
+      setApplicants(data);
+      const urls = {};
+      await Promise.all(
+        data.filter(a => a.resume_url).map(async (a) => {
+          const { data: signed } = await supabase.storage
+            .from("resumes").createSignedUrl(a.resume_url, 3600);
+          if (signed?.signedUrl) urls[a.id] = signed.signedUrl;
+        })
+      );
+      setResumeUrls(urls);
+    }
+    setLoading(false);
+  };
+
+  const handleStatusChange = async (appId, newStatus) => {
+    const { error } = await supabase
+      .from("applications")
+      .update({ status: newStatus, updated_at: new Date().toISOString() })
+      .eq("id", appId);
+    if (!error) {
+      setApplicants(prev => prev.map(a => a.id === appId ? { ...a, status: newStatus } : a));
+      onStatusChange?.();
+
+      // If shortlisted, send a message via interview_invites system
+      if (newStatus === "shortlisted") {
+        const app = applicants.find(a => a.id === appId);
+        if (app) {
+          // Check if an invite already exists for this candidate + job
+          const { data: existingInvite } = await supabase
+            .from("interview_invites")
+            .select("id")
+            .eq("candidate_id", app.candidate_id)
+            .eq("job_post_id", post.id)
+            .maybeSingle();
+
+          if (existingInvite) {
+            // Send message in existing chat
+            await supabase.from("invite_messages").insert({
+              invite_id: existingInvite.id,
+              sender_id: null,
+              sender_role: "recruiter",
+              content: `🎉 Great news! You've been shortlisted for the position "${post.title}". We were impressed by your profile and would like to move forward. Please reply here to discuss the next steps!`,
+            });
+          } else {
+            // Create a new invite with the shortlist message
+            const { data: newInvite } = await supabase
+              .from("interview_invites")
+              .insert({
+                recruiter_id: supabase.auth.getUser ? (await supabase.auth.getUser()).data.user?.id : null,
+                recruiter_email: (await supabase.auth.getUser()).data.user?.email,
+                candidate_id: app.candidate_id,
+                candidate_name: app.candidate_name,
+                job_post_id: post.id,
+                message: `🎉 You've been shortlisted for "${post.title}"!`,
+                status: "pending",
+                candidate_read: false,
+              })
+              .select()
+              .single();
+
+            if (newInvite) {
+              await supabase.from("invite_messages").insert({
+                invite_id: newInvite.id,
+                sender_id: (await supabase.auth.getUser()).data.user?.id,
+                sender_role: "recruiter",
+                content: `🎉 Great news! You've been shortlisted for the position "${post.title}". We were impressed by your profile and would like to move forward. Please reply here to discuss the next steps!`,
+              });
+            }
+          }
+        }
+      }
+    }
+  };
+
+  const statusColors = {
+    new:         { color: "#fcd34d", bg: "rgba(245,158,11,0.12)",  border: "rgba(245,158,11,0.25)" },
+    viewed:      { color: "#a0c4ff", bg: "rgba(102,126,234,0.12)", border: "rgba(102,126,234,0.25)" },
+    shortlisted: { color: "#86efac", bg: "rgba(67,233,123,0.12)",  border: "rgba(67,233,123,0.25)" },
+    rejected:    { color: "#718096", bg: "rgba(255,255,255,0.05)", border: "rgba(255,255,255,0.1)" },
+  };
+
+  if (!post) return null;
+
+  return (
+    <div className="rd-drawer-overlay" onClick={onClose}>
+      <div className="rd-drawer rd-drawer-wide" onClick={e => e.stopPropagation()}>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"20px 28px 0" }}>
+          <div>
+            <div style={{ fontSize:18, fontWeight:800, color:"#fff", marginBottom:4 }}>{post.title}</div>
+            <div style={{ fontSize:13, color:"#718096" }}>
+              {post.location} · {post.type}
+              {applicants.length > 0 && <span style={{ color:"#43e97b", marginLeft:8 }}>· {applicants.length} applicant{applicants.length !== 1 ? "s" : ""}</span>}
+            </div>
+          </div>
+          <button className="rd-modal-close" onClick={onClose}><Icon.X /></button>
+        </div>
+        <div className="rd-drawer-body" style={{ gap:12, paddingTop:20 }}>
+          {loading ? (
+            <div style={{ display:"flex", alignItems:"center", justifyContent:"center", padding:"60px 0" }}>
+              <div className="rd-loading-ring" />
+            </div>
+          ) : applicants.length === 0 ? (
+            <div style={{ display:"flex", flexDirection:"column", alignItems:"center", textAlign:"center", padding:"60px 20px", gap:12 }}>
+              <div style={{ fontSize:40, opacity:0.4 }}>📭</div>
+              <div style={{ fontSize:16, fontWeight:700, color:"#fff" }}>No applicants yet</div>
+              <div style={{ fontSize:13, color:"#4a4a6a" }}>Share this job post to start receiving applications.</div>
+            </div>
+          ) : (
+            applicants.map((app) => {
+              const name = app.candidate_name || app.candidate_email?.split("@")[0] || "Candidate";
+              const init = getInitial(name);
+              const sc = statusColors[app.status] || statusColors.new;
+              return (
+                <div key={app.id} className="appl-card">
+                  <div className="appl-card-top">
+                    <div className="appl-card-left">
+                      <div className="rd-av rd-av-sm" style={{ background:`linear-gradient(135deg, ${avatarColor(init)})`, width:44, height:44, fontSize:17, borderRadius:12 }}>{init}</div>
+                      <div>
+                        <div className="appl-name">{name}</div>
+                        <div className="appl-meta">
+                          {app.role && <span>{app.role}</span>}
+                          {app.role && app.college && <span className="appl-sep">·</span>}
+                          {app.college && <span>{app.college}</span>}
+                          {app.experience && <><span className="appl-sep">·</span><span>{app.experience}</span></>}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="appl-card-right">
+                      <span className="appl-status-badge" style={{ color:sc.color, background:sc.bg, border:`1px solid ${sc.border}` }}>{app.status}</span>
+                      <div className="appl-date">{new Date(app.created_at).toLocaleDateString("en-IN", { day:"2-digit", month:"short", year:"numeric" })}</div>
+                    </div>
+                  </div>
+                  {app.skills?.length > 0 && (
+                    <div className="appl-skills">
+                      {app.skills.slice(0, 5).map((s, i) => <span key={i} className="rd-skill-tag rd-skill-sm">{s}</span>)}
+                    </div>
+                  )}
+                  <div className="appl-info-row">
+                    {app.location && <span className="appl-info-chip"><Icon.MapPin /> {app.location}</span>}
+                    {app.candidate_email && <span className="appl-info-chip"><Icon.Mail /> {app.candidate_email}</span>}
+                  </div>
+                  <div className="appl-actions">
+                    <select className="appl-status-select" value={app.status} onChange={e => handleStatusChange(app.id, e.target.value)}>
+                      <option value="new">New</option>
+                      <option value="viewed">Viewed</option>
+                      <option value="shortlisted">Shortlisted</option>
+                      <option value="rejected">Rejected</option>
+                    </select>
+                    {app.resume_url && resumeUrls[app.id] && (
+                      <a href={resumeUrls[app.id]} target="_blank" rel="noopener noreferrer" className="rd-action-btn" style={{ textDecoration:"none" }}>
+                        <Icon.Download /> Resume
+                      </a>
+                    )}
+                    <button className="rd-action-btn rd-action-primary" onClick={() => onInvite(app)}>
+                      <Icon.Send /> Invite
+                    </button>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ─── Candidate / Resume Drawer ──────────────────────── */
 function CandidateDrawer({ candidate, onClose, onInvite, resumeUrl }) {
   if (!candidate) return null;
@@ -377,6 +563,7 @@ export default function RecruiterDashboard() {
   // NEW: chat state
   const [activeChatInvite, setActiveChatInvite] = useState(null);
   const [inviteUnreadCounts, setInviteUnreadCounts] = useState({});
+  const [applicantsPost, setApplicantsPost] = useState(null);
 
   useEffect(() => { checkUser(); }, []);
 
@@ -444,6 +631,13 @@ export default function RecruiterDashboard() {
           }));
           showToast("New message from a candidate!");
         }
+      })
+      .on("postgres_changes", {
+        event: "INSERT",
+        schema: "public",
+        table: "applications",
+      }, () => {
+        fetchPosts(user.id);
       })
       .subscribe();
     return () => supabase.removeChannel(channel);
@@ -772,6 +966,7 @@ export default function RecruiterDashboard() {
                         </div>
                         <div className="rd-post-card-actions">
                           <button className="rd-action-btn" onClick={() => { setEditingPost(post); setShowPostModal(true); }}><Icon.Edit /> Edit</button>
+                          <button className="rd-action-btn rd-action-primary" onClick={() => setApplicantsPost(post)}><Icon.Users /> Applicants{post.applicants > 0 && (<span className="rd-chat-unread-badge" style={{ background: "#667eea" }}>{post.applicants}</span>)}</button>
                           <button className="rd-action-btn" onClick={() => handleTogglePost(post.id, post.active)}>{post.active ? <><Icon.Eye /> Pause</> : <><Icon.Globe /> Activate</>}</button>
                           <button className="rd-action-btn rd-action-danger" onClick={() => handleDeletePost(post.id)}><Icon.Trash /> Delete</button>
                         </div>
@@ -968,7 +1163,7 @@ export default function RecruiterDashboard() {
                       <div key={p.id} className="rd-post-perf-row">
                         <div><div className="rd-post-perf-title">{p.title}</div><div className="rd-post-perf-meta">{p.type}</div></div>
                         <div className="rd-post-perf-right">
-                          <span className="rd-applicants-badge">{p.applicants} applied</span>
+                          <button className="rd-applicants-badge" style={{ cursor:"pointer", border:"none" }} onClick={() => { setApplicantsPost(p); setActiveTab("posts"); }}>{p.applicants} applicants</button>
                           <span className={`rd-live-dot ${p.active ? "live" : "paused"}`} />
                         </div>
                       </div>
@@ -1023,6 +1218,22 @@ export default function RecruiterDashboard() {
       )}
       {inviteTarget && (
         <InviteModal candidate={inviteTarget} posts={posts.filter(p => p.active)} onClose={() => { setInviteTarget(null); setSelectedCandidate(null); }} onSend={handleSendInvite} />
+      )}
+
+      {applicantsPost && (
+        <ApplicantsDrawer
+          post={applicantsPost}
+          onClose={() => { setApplicantsPost(null); fetchPosts(user.id); }}
+          onInvite={(app) => {
+            setApplicantsPost(null);
+            setInviteTarget({
+              candidate_id:    app.candidate_id,
+              candidate_name:  app.candidate_name,
+              candidate_email: app.candidate_email,
+            });
+          }}
+          onStatusChange={() => fetchPosts(user.id)}
+        />
       )}
 
       {/* NEW: Recruiter Chat Modal */}

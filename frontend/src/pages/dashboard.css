@@ -2485,3 +2485,10 @@ body {
   .jb-type-pills { gap: 6px; }
   .jb-card-footer { flex-direction: column; align-items: flex-start; }
 }
+
+.jb-apply-btn-done {
+  background: rgba(67, 233, 123, 0.15) !important;
+  box-shadow: none !important;
+  color: #86efac !important;
+  cursor: default;
+}
