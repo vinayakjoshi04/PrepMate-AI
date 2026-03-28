@@ -10,7 +10,6 @@ import Signup from "./auth/Signup";
 // Protected Pages
 import Dashboard from "./pages/Dashboard";
 import CreateInterview from "./pages/CreateInterview";
-import SkillsReview from "./pages/SkillsReview";
 import Interview from "./pages/Interview";
 import Results from "./pages/Results";
 import RecruiterDashboard from "./pages/RecruiterDashboard";
@@ -95,7 +94,6 @@ function App() {
         {/* Protected Candidate Routes */}
         <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/create-interview" element={<ProtectedRoute><CreateInterview /></ProtectedRoute>} />
-        <Route path="/skills-review" element={<ProtectedRoute><SkillsReview /></ProtectedRoute>} />
         <Route path="/interview" element={<ProtectedRoute><Interview /></ProtectedRoute>} />
         <Route path="/results" element={<ProtectedRoute><Results /></ProtectedRoute>} />
         <Route path="/resume-analyzer" element={<ProtectedRoute><ResumeAnalyzer /></ProtectedRoute>} />

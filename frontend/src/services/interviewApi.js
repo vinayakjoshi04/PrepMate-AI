@@ -1,7 +1,13 @@
 // frontend/src/services/interviewApi.js
 
-// Direct API URL - No environment variables needed
-const API_BASE_URL = "https://prepmate-ai-backend-ckrb.onrender.com/api";
+const getAPIUrl = () => {
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    return 'http://localhost:5000';
+  }
+  return 'https://prepmate-ai-backend-ckrb.onrender.com';
+};
+
+const API_BASE_URL = `${getAPIUrl()}/api`;
 
 console.log("🌐 API Base URL:", API_BASE_URL);
 
