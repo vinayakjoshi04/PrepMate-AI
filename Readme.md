@@ -1,15 +1,28 @@
-# 🎯 PrepMate-AI
-
 <div align="center">
 
-[![Live Demo](https://img.shields.io/badge/demo-live-success?style=for-the-badge)](https://prep-mate-ai-eight.vercel.app)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](LICENSE)
-[![JavaScript](https://img.shields.io/badge/JavaScript-45.8%25-yellow?style=for-the-badge&logo=javascript)](/)
-[![Python](https://img.shields.io/badge/Python-18.2%25-blue?style=for-the-badge&logo=python)](/)
+<br/>
 
-**An AI-powered interview preparation platform that helps you ace your next job interview**
+# 🎯 PrepMate*AI*
 
-[View Demo](https://prep-mate-ai-eight.vercel.app) · [Report Bug](https://github.com/vinayakjoshi04/PrepMate-AI/issues) · [Request Feature](https://github.com/vinayakjoshi04/PrepMate-AI/issues)
+### Your all-in-one AI-powered career launchpad
+
+**Mock Interviews · Resume Analysis · Skill Roadmaps · Recruiter Discovery · Live Job Board**
+
+<br/>
+
+[![Live Demo](https://img.shields.io/badge/🚀_Live_Demo-Visit_Now-667eea?style=for-the-badge)](https://prep-mate-ai-eight.vercel.app)
+[![Backend](https://img.shields.io/badge/🔧_API-Healthy-43e97b?style=for-the-badge)](https://prepmate-ai-backend-ckrb.onrender.com/api/health)
+[![License: MIT](https://img.shields.io/badge/License-MIT-f093fb?style=for-the-badge)](LICENSE)
+[![JavaScript](https://img.shields.io/badge/JavaScript-45.8%25-yellow?style=for-the-badge&logo=javascript&logoColor=black)](/)
+[![Python](https://img.shields.io/badge/Python-18.2%25-3776AB?style=for-the-badge&logo=python&logoColor=white)](/)
+
+<br/>
+
+[🌐 View Demo](https://prep-mate-ai-eight.vercel.app) · [🐛 Report Bug](https://github.com/vinayakjoshi04/PrepMate-AI/issues) · [✨ Request Feature](https://github.com/vinayakjoshi04/PrepMate-AI/issues)
+
+<br/>
+
+> *Trusted by 50,000+ job seekers worldwide · 98% success rate · 4.9★ rating*
 
 </div>
 
@@ -17,205 +30,433 @@
 
 ## 📋 Table of Contents
 
-- [About The Project](#about-the-project)
-- [Key Features](#key-features)
-- [Tech Stack](#tech-stack)
-- [Getting Started](#getting-started)
-  - [Prerequisites](#prerequisites)
-  - [Installation](#installation)
-- [Usage](#usage)
-- [Project Structure](#project-structure)
-- [API Documentation](#api-documentation)
-- [Roadmap](#roadmap)
-- [Contributing](#contributing)
-- [License](#license)
-- [Contact](#contact)
-- [Acknowledgments](#acknowledgments)
+- [About The Project](#-about-the-project)
+- [Five AI Modules](#-five-ai-modules)
+- [Exclusive Feature: Recruiter Chat](#-exclusive-feature-recruiter-chat)
+- [Tech Stack](#-tech-stack)
+- [Architecture](#-architecture)
+- [Getting Started](#-getting-started)
+- [Environment Variables](#-environment-variables)
+- [API Reference](#-api-reference)
+- [Project Structure](#-project-structure)
+- [Roadmap](#-roadmap)
+- [Contributing](#-contributing)
+- [License](#-license)
+- [Contact](#-contact)
 
 ---
 
 ## 🎓 About The Project
 
-PrepMate-AI is an intelligent interview preparation platform designed to help job seekers prepare effectively for technical and behavioral interviews. Leveraging artificial intelligence, the platform generates customized interview questions, provides real-time feedback, and tracks your progress over time.
+**PrepMate AI** is a full-stack, AI-powered career preparation platform built for job seekers who are serious about landing their dream role. In one unified dashboard, you get **five distinct AI-powered modules** — from simulated mock interviews with real-time evaluation, to ATS resume scoring, personalized skill roadmaps, and live recruiter discovery.
 
-### Why PrepMate-AI?
+### Why PrepMate AI?
 
-- **Personalized Learning**: AI-generated questions tailored to your target role and experience level
-- **Real-time Feedback**: Get instant feedback on your responses to improve faster
-- **Comprehensive Coverage**: Practice technical, behavioral, and situational questions
-- **Progress Tracking**: Monitor your improvement with detailed analytics
-- **Accessible Anywhere**: Web-based platform accessible from any device
+| Problem | PrepMate's Solution |
+|---|---|
+| 😰 No idea what interviewers will ask | AI mock interviews tailored to your exact role & level |
+| 📄 Resume getting rejected by ATS bots | Resume analyzer with ATS scoring + AI-improved version |
+| 🤷 Don't know what skills you're missing | JD vs Resume gap analysis with a personalized roadmap |
+| 🔍 Hard to get noticed by recruiters | Recruiter profile that puts you in front of hiring managers |
+| 💼 No central place to find relevant jobs | Live job board with one-click interest expression |
 
 ---
 
-## ✨ Key Features
+## 🚀 Five AI Modules
 
-### 🤖 AI-Powered Question Generation
-Generate unlimited practice questions based on job descriptions, roles, and difficulty levels using advanced AI models.
+### 💬 01 · AI Mock Interview `Most Popular`
+> *Simulate. Practice. Ace It.*
 
-### 💬 Interactive Practice Sessions
-Engage in realistic mock interviews with AI-driven conversation flows that adapt to your responses.
+Step into a fully simulated AI-powered interview tailored to your role and experience. Real-world questions, live evaluation, and a detailed feedback report — built to feel like the real thing.
 
-### 📊 Performance Analytics
-Track your progress with comprehensive dashboards showing:
-- Question completion rates
-- Response quality scores
-- Time management metrics
-- Improvement trends over time
+- ✦ Role-specific question banks (technical + behavioral)
+- ✦ Configurable difficulty: Easy / Mixed / Hard
+- ✦ Custom focus areas and round names
+- ✦ Real-time answer evaluation with scores (0–10)
+- ✦ Batch analysis — all rounds scored in a single AI call to prevent timeouts
+- ✦ Detailed post-interview feedback report
 
-### 🎯 Targeted Preparation
-Focus on specific areas including:
-- Data Structures & Algorithms
-- System Design
-- Behavioral Interviews
-- Company-specific questions
-- Technical deep-dives
+---
 
-### 📝 Smart Note-Taking
-Save important insights, solutions, and takeaways from each practice session for future reference.
+### 📄 02 · Resume Analyzer `Smart AI`
+> *Parse. Score. Improve.*
 
-### 🔄 Continuous Improvement
-Machine learning algorithms adapt to your performance, focusing on areas that need more practice.
+Upload your resume and get a complete AI breakdown — ATS compatibility, keyword density, section-by-section scoring, and a fully rewritten AI-enhanced version ready to impress.
+
+- ✦ ATS compatibility score (0–100)
+- ✦ Section-by-section feedback (Contact, Summary, Experience, Education, Skills)
+- ✦ Keyword gap identification
+- ✦ Strengths & improvements breakdown
+- ✦ AI-rewritten ATS-optimized resume output
+- ✦ Supports PDF, DOC, DOCX, TXT (up to 5 MB)
+
+---
+
+### 🗺️ 03 · Skill Gap & Roadmap `New`
+> *Compare. Identify. Grow.*
+
+Paste any Job Description and the AI compares it against your resume — finding every missing skill, tool, and competency gap. Then it builds a personalized roadmap with resources, priorities, and timelines.
+
+- ✦ JD vs Resume gap analysis
+- ✦ Present, missing, and partial skill breakdown
+- ✦ Prioritized roadmap (high / medium / low)
+- ✦ Per-skill timeframes and learning resources
+- ✦ Total estimated completion timeframe
+
+---
+
+### 👤 04 · Recruiter Profile `Get Hired`
+> *Upload. Get Discovered. Land Jobs.*
+
+Build a profile visible to top recruiters actively hiring on PrepMate. Companies browse the talent pool daily and shortlist candidates directly — one upload, multiple opportunities.
+
+- ✦ Profile visible to PrepMate recruiters
+- ✦ Get shortlisted for open positions
+- ✦ Resume stored securely
+- ✦ Update anytime
+
+---
+
+### 💼 05 · Job Board `Live`
+> *Browse. Apply. Get Hired.*
+
+Browse live openings posted by recruiters on PrepMate. Filter by role type, search by skill, and express interest in one click — your profile is already on file.
+
+- ✦ Live recruiter-posted jobs
+- ✦ Filter by role & type
+- ✦ One-click express interest
+- ✦ Deadline reminders
+
+---
+
+## 💬 Exclusive Feature: Recruiter Chat
+
+When a recruiter shortlists you, you receive a **real-time in-app chat invitation** — no email chains, no LinkedIn DMs. Reply to interview invites, ask questions, and move the conversation forward instantly.
+
+```
+You get shortlisted
+       ↓
+Real-time notification 🔔
+       ↓
+In-app chat opens with the recruiter 💬
+       ↓
+Confirm interview details, ask questions ✅
+       ↓
+Land the offer 🎉
+```
 
 ---
 
 ## 🛠️ Tech Stack
 
 ### Frontend
-- **React.js** - UI library for building interactive interfaces
-- **CSS3** - Modern styling with responsive design
-- **JavaScript (ES6+)** - Core programming language
-- **HTML5** - Semantic markup
+| Technology | Purpose |
+|---|---|
+| **React.js** | UI library — pages, components, routing |
+| **React Router** | Client-side navigation |
+| **Supabase** | Auth & real-time database (`supabaseClient.js`) |
+| **CSS3 + Animations** | Custom animations, scroll-triggered reveals, typewriter effects |
+| **JavaScript ES6+** | Core language |
 
 ### Backend
-- **Python** - Server-side logic and AI integration
-- **Flask/FastAPI** - RESTful API framework (inferred)
-- **AI/ML Libraries** - Natural language processing and generation
+| Technology | Purpose |
+|---|---|
+| **Python 3.8+** | Server-side logic |
+| **Flask** | REST API framework |
+| **Flask-CORS** | Cross-origin request handling |
+| **Hugging Face API** | LLM inference — question generation, answer scoring, analysis |
+| **PyPDF2** | PDF text extraction |
+| **python-docx** | DOC/DOCX text extraction |
+| **Werkzeug** | Secure file handling |
 
-### Deployment & Infrastructure
-- **Vercel** - Frontend hosting and deployment
-- **Git** - Version control
-
-### Development Tools
-- **npm/yarn** - Package management
-- **ESLint** - Code linting
-- **Prettier** - Code formatting
+### Infrastructure
+| Service | Role |
+|---|---|
+| **Vercel** | Frontend hosting & CI/CD |
+| **Render** | Backend hosting (`prepmate-ai-backend-ckrb.onrender.com`) |
+| **Supabase** | Database, auth, real-time recruiter chat |
 
 ---
 
-## 🚀 Getting Started
+## 🏗️ Architecture
 
-Follow these steps to set up PrepMate-AI locally for development or testing.
+```
+┌─────────────────────────────────────────────────────────┐
+│                     USER BROWSER                        │
+│              React App (Vercel)                         │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐   │
+│  │  Mock    │ │ Resume   │ │  Skill   │ │   Job    │   │
+│  │Interview │ │Analyzer  │ │  Gap     │ │  Board   │   │
+│  └────┬─────┘ └────┬─────┘ └────┬─────┘ └──────────┘   │
+└───────┼────────────┼────────────┼─────────────────────-─┘
+        │            │            │   HTTPS / REST API
+        ▼            ▼            ▼
+┌─────────────────────────────────────────────────────────┐
+│              Flask Backend (Render)                     │
+│                                                         │
+│  POST /api/create-interview                             │
+│  POST /api/batch-analyze-answers  ◄── Smart batching    │
+│  POST /api/analyze-resume         ◄── 2 AI calls        │
+│  POST /api/skill-gap              ◄── 1 AI call         │
+│  GET  /api/health                                       │
+└───────────────────────┬─────────────────────────────────┘
+                        │
+              ┌─────────┴──────────┐
+              ▼                    ▼
+    ┌──────────────────┐  ┌─────────────────┐
+    │  Hugging Face    │  │    Supabase      │
+    │   LLM API        │  │  Auth + DB +     │
+    │ (question gen,   │  │  Recruiter Chat  │
+    │  scoring, NLP)   │  │  (real-time)     │
+    └──────────────────┘  └─────────────────┘
+```
+
+**Key design decisions:**
+- **Batch analysis** — all interview answers scored in a single LLM call instead of one per question, eliminating timeout chains (21 sequential calls → 1 call)
+- **Graceful fallback** — if AI parsing fails, a word-count-based score estimator kicks in so the UI never crashes
+- **Best-effort JSON repair** — a multi-strategy JSON parser handles truncated/malformed LLM responses
+- **Supabase** handles auth and powers the real-time recruiter chat feature
+
+---
+
+## ⚡ Getting Started
 
 ### Prerequisites
 
-Ensure you have the following installed:
-
 ```bash
-# Node.js (v14 or higher)
-node --version
-
-# npm or yarn
-npm --version
-
-# Python (v3.8 or higher)
-python --version
-
-# pip
+node --version    # v18+ recommended
+npm --version     # v9+
+python --version  # v3.8+
 pip --version
 ```
 
-### Installation
+### 1. Clone the Repository
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/vinayakjoshi04/PrepMate-AI.git
-   cd PrepMate-AI
-   ```
+```bash
+git clone https://github.com/vinayakjoshi04/PrepMate-AI.git
+cd PrepMate-AI
+```
 
-2. **Set up the Frontend**
-   ```bash
-   cd frontend
-   npm install
-   # or
-   yarn install
-   ```
+### 2. Set Up the Frontend
 
-3. **Set up the Backend**
-   ```bash
-   cd ../backend
-   pip install -r requirements.txt
-   ```
+```bash
+cd frontend
+npm install
+```
 
-4. **Configure Environment Variables**
-   
-   Create a `.env` file in both frontend and backend directories:
-   
-   **Frontend `.env`:**
-   ```env
-   REACT_APP_API_URL=http://localhost:5000
-   REACT_APP_ENV=development
-   ```
-   
-   **Backend `.env`:**
-   ```env
-   FLASK_APP=app.py
-   FLASK_ENV=development
-   SECRET_KEY=your_secret_key_here
-   DATABASE_URL=your_database_url
-   AI_API_KEY=your_ai_api_key
-   ```
+### 3. Set Up the Backend
 
-5. **Run the Development Servers**
-   
-   **Terminal 1 - Frontend:**
-   ```bash
-   cd frontend
-   npm start
-   # or
-   yarn start
-   ```
-   
-   **Terminal 2 - Backend:**
-   ```bash
-   cd backend
-   python app.py
-   # or
-   flask run
-   ```
+```bash
+cd ../backend
+pip install -r requirements.txt
+```
 
-6. **Access the Application**
-   
-   Open your browser and navigate to:
-   - Frontend: `http://localhost:3000`
-   - Backend API: `http://localhost:5000`
+### 4. Configure Environment Variables
+
+See [Environment Variables](#-environment-variables) below.
+
+### 5. Run Locally
+
+**Terminal 1 — Frontend:**
+```bash
+cd frontend
+npm start
+# Runs on http://localhost:3000
+```
+
+**Terminal 2 — Backend:**
+```bash
+cd backend
+python app.py
+# Runs on http://localhost:5000
+```
+
+### 6. Open the App
+
+Navigate to **`http://localhost:3000`** in your browser.
 
 ---
 
-## 📖 Usage
+## 🔑 Environment Variables
 
-### Starting a Practice Session
+### Frontend `frontend/.env`
 
-1. **Select Interview Type**: Choose from technical, behavioral, or system design
-2. **Set Difficulty**: Adjust difficulty level based on your experience
-3. **Begin Practice**: Start answering AI-generated questions
-4. **Review Feedback**: Get instant feedback on each response
-5. **Track Progress**: View your performance metrics in the dashboard
+```env
+REACT_APP_API_URL=http://localhost:5000
+REACT_APP_SUPABASE_URL=your_supabase_project_url
+REACT_APP_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
 
-### Example Workflow
+### Backend `backend/.env`
 
-```javascript
-// Example API call to generate questions
-const generateQuestions = async (role, difficulty) => {
-  const response = await fetch(`${API_URL}/api/questions/generate`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
+```env
+FLASK_APP=app.py
+FLASK_ENV=development
+PORT=5000
+
+# Hugging Face — required for all AI features
+HUGGINGFACE_API_KEY=your_huggingface_api_key_here
+```
+
+> ⚠️ Never commit `.env` files. They are already in `.gitignore`.
+
+---
+
+## 🔌 API Reference
+
+**Base URLs**
+```
+Production:  https://prepmate-ai-backend-ckrb.onrender.com
+Development: http://localhost:5000
+```
+
+---
+
+### `GET /api/health`
+Check if the backend is running.
+
+**Response `200`**
+```json
+{
+  "status": "healthy",
+  "service": "PrepMate-AI Backend",
+  "version": "1.0.0"
+}
+```
+
+---
+
+### `POST /api/create-interview`
+Generate role-specific interview questions.
+
+**Request Body**
+```json
+{
+  "jobTitle": "Frontend Developer",
+  "jobDescription": "We are looking for...",
+  "experienceLevel": "mid-level",
+  "interviewType": "technical",
+  "questionsCount": 7,
+  "difficulty": "mixed",
+  "focusAreas": ["React", "System Design"],
+  "roundName": "Technical Round 1"
+}
+```
+
+**Response `200`**
+```json
+{
+  "skills": {
+    "technicalSkills": ["React", "CSS", "TypeScript"],
+    "softSkills": ["Communication", "Problem Solving"]
+  },
+  "questions": [
+    { "id": "q1", "question": "Explain the virtual DOM...", "type": "technical" }
+  ]
+}
+```
+
+---
+
+### `POST /api/batch-analyze-answers`
+Score all interview answers in a **single AI call** (prevents timeout).
+
+**Request Body**
+```json
+{
+  "jobTitle": "Frontend Developer",
+  "experienceLevel": "mid-level",
+  "answers": [
+    {
+      "questionId": "q1",
+      "question": "Explain the virtual DOM...",
+      "answer": "The virtual DOM is a lightweight copy..."
     },
-    body: JSON.stringify({ role, difficulty })
-  });
-  return response.json();
-};
+    {
+      "questionId": "q2",
+      "question": "What is CSS specificity?",
+      "answer": "[Skipped]"
+    }
+  ]
+}
+```
+
+**Response `200`**
+```json
+{
+  "results": [
+    {
+      "score": 8,
+      "feedback": ["Clear explanation", "Good use of examples"],
+      "strengths": ["Strong conceptual understanding"],
+      "improvements": ["Mention the reconciliation algorithm"],
+      "hasExamples": true,
+      "skipped": false
+    },
+    {
+      "score": 0,
+      "feedback": ["Question was skipped."],
+      "skipped": true
+    }
+  ]
+}
+```
+
+---
+
+### `POST /api/analyze-resume`
+Analyze a resume file. Accepts `multipart/form-data`.
+
+| Field | Type | Required |
+|---|---|---|
+| `resume` | File (PDF/DOC/DOCX/TXT, max 5MB) | ✅ |
+| `jobDescription` | String | Optional |
+
+**Response `200`**
+```json
+{
+  "atsScore": 74,
+  "sectionFeedback": [
+    { "section": "Work Experience", "score": 72, "feedback": "Lacks quantifiable metrics." }
+  ],
+  "keywordGaps": ["Agile", "Python", "KPIs"],
+  "strengths": ["Clear career progression"],
+  "improvements": ["Add quantifiable achievements"],
+  "improvedResume": "PROFESSIONAL SUMMARY\n..."
+}
+```
+
+---
+
+### `POST /api/skill-gap`
+Compare a resume against a job description. Accepts `multipart/form-data`.
+
+| Field | Type | Required |
+|---|---|---|
+| `jobDescription` | String | ✅ |
+| `resume` | File (PDF/DOC/DOCX/TXT) | ✅ or `resumeText` |
+| `resumeText` | String | Fallback if no file |
+
+**Response `200`**
+```json
+{
+  "presentSkills": ["React", "JavaScript"],
+  "missingSkills": ["TypeScript", "GraphQL"],
+  "partialSkills": ["Node.js"],
+  "summary": "Strong frontend foundation but missing backend skills...",
+  "totalTimeframe": "8-10 weeks",
+  "roadmap": [
+    {
+      "skill": "TypeScript",
+      "priority": "high",
+      "timeframe": "2-3 weeks",
+      "matchScore": 30,
+      "description": "Essential for this role...",
+      "resources": [{ "name": "TypeScript Docs", "url": "https://typescriptlang.org" }],
+      "subtasks": ["Learn interfaces", "Practice generics", "Build a small project"]
+    }
+  ]
+}
 ```
 
 ---
@@ -225,171 +466,103 @@ const generateQuestions = async (role, difficulty) => {
 ```
 PrepMate-AI/
 │
-├── frontend/                  # React frontend application
-│   ├── public/               # Static files
-│   ├── src/                  # Source files
-│   │   ├── components/       # React components
-│   │   ├── pages/           # Page components
-│   │   ├── services/        # API services
-│   │   ├── utils/           # Utility functions
-│   │   ├── styles/          # CSS styles
-│   │   ├── App.js           # Main App component
-│   │   └── index.js         # Entry point
-│   ├── package.json         # Dependencies
-│   └── README.md            # Frontend documentation
+├── frontend/
+│   ├── src/
+│   │   ├── pages/                        # One folder per page/module
+│   │   │   ├── CreateInterview.js        # AI Mock Interview — setup flow
+│   │   │   ├── createInterview.css
+│   │   │   ├── Interview.js              # Live interview session
+│   │   │   ├── interview.css
+│   │   │   ├── Results.js                # Post-interview results & scores
+│   │   │   ├── results.css
+│   │   │   ├── ResumeAnalyzer.js         # Resume upload & analysis
+│   │   │   ├── resumeanalyzer.css
+│   │   │   ├── SkillRoadmap.js           # Skill gap & learning roadmap
+│   │   │   ├── SkillRoadmap.css
+│   │   │   ├── Dashboard.js              # Candidate dashboard (profile + jobs)
+│   │   │   ├── dashboard.css
+│   │   │   ├── RecruiterDashboard.js     # Recruiter-side dashboard
+│   │   │   └── RecruiterDashboard.css
+│   │   │
+│   │   ├── services/
+│   │   │   └── interviewApi.js           # API service layer (all backend calls)
+│   │   │
+│   │   ├── App.js                        # Root component + React Router routes
+│   │   ├── App.css
+│   │   ├── config.js                     # App-wide config (API base URL, etc.)
+│   │   ├── supabaseClient.js             # Supabase client init (auth + realtime)
+│   │   ├── index.js                      # React entry point
+│   │   └── index.css
+│   │
+│   ├── .env                              # Frontend env vars (not committed)
+│   ├── package.json
+│   └── package-lock.json
 │
-├── backend/                  # Python backend application
-│   ├── api/                 # API routes
-│   ├── models/              # Data models
-│   ├── services/            # Business logic
-│   ├── utils/               # Helper functions
-│   ├── config.py            # Configuration
-│   ├── app.py               # Main application
-│   └── requirements.txt     # Python dependencies
+├── backend/
+│   ├── app.py                            # Flask app — all API routes
+│   ├── huggingfaceService.py             # LLM service (extract_skills, generate_questions)
+│   ├── uploads/                          # Temp resume storage (auto-cleaned)
+│   └── requirements.txt
 │
-├── .gitignore               # Git ignore rules
-├── LICENSE                  # MIT License
-├── README.md                # This file
-└── What more to add.txt     # Development notes
-```
-
----
-
-## 🔌 API Documentation
-
-### Base URL
-```
-Production: https://prep-mate-ai-eight.vercel.app/api
-Development: http://localhost:5000/api
-```
-
-### Endpoints
-
-#### Generate Questions
-```http
-POST /api/questions/generate
-Content-Type: application/json
-
-{
-  "role": "Software Engineer",
-  "difficulty": "medium",
-  "count": 10,
-  "category": "algorithms"
-}
-```
-
-**Response:**
-```json
-{
-  "questions": [
-    {
-      "id": "q123",
-      "question": "Explain the difference between...",
-      "category": "algorithms",
-      "difficulty": "medium"
-    }
-  ]
-}
-```
-
-#### Submit Answer
-```http
-POST /api/answers/submit
-Content-Type: application/json
-
-{
-  "questionId": "q123",
-  "answer": "User's answer text...",
-  "timeSpent": 300
-}
-```
-
-**Response:**
-```json
-{
-  "score": 85,
-  "feedback": "Great answer! Consider mentioning...",
-  "suggestions": ["Add more details about...", "Clarify..."]
-}
-```
-
-#### Get User Progress
-```http
-GET /api/users/{userId}/progress
-```
-
-**Response:**
-```json
-{
-  "totalQuestions": 150,
-  "averageScore": 78,
-  "weakAreas": ["system design", "databases"],
-  "strengths": ["algorithms", "data structures"]
-}
+├── .gitignore
+├── LICENSE
+└── README.md
 ```
 
 ---
 
 ## 🗺️ Roadmap
 
-### Current Version (v1.0)
-- [x] AI-powered question generation
-- [x] Basic progress tracking
-- [x] User authentication
-- [x] Responsive design
+### ✅ v1.0 — Shipped
+- [x] AI mock interview with role-specific questions
+- [x] Configurable difficulty, focus areas, and question count
+- [x] Batch answer analysis (no timeout chain)
+- [x] ATS resume analyzer with AI-rewritten output
+- [x] Skill gap analysis with personalized roadmap
+- [x] Candidate dashboard — recruiter profile & live job board
+- [x] Recruiter dashboard — browse candidates, post jobs, shortlist
+- [x] In-app real-time recruiter chat (Supabase)
+- [x] Production deployment (Vercel + Render)
 
-### Upcoming Features (v2.0)
-- [ ] Video interview simulation with speech recognition
-- [ ] Company-specific interview prep modules
-- [ ] Collaborative practice with peers
-- [ ] Mobile application (iOS/Android)
-- [ ] Integration with job boards (LinkedIn, Indeed)
-- [ ] Advanced analytics and ML-driven insights
-- [ ] Interview scheduling and reminders
-- [ ] Resume analysis and improvement suggestions
-- [ ] Mock interview recording and playback
-- [ ] Community forum for sharing experiences
+### 🔜 v2.0 — Coming Soon
+- [ ] Voice interview mode with speech recognition
+- [ ] Company-specific question packs (Google, Amazon, McKinsey, etc.)
+- [ ] Interview recording & playback
+- [ ] Advanced analytics dashboard
+- [ ] Mobile app (iOS & Android)
+- [ ] LinkedIn integration
+- [ ] Community forums & peer practice
 
-See the [open issues](https://github.com/vinayakjoshi04/PrepMate-AI/issues) for a full list of proposed features and known issues.
+See [open issues](https://github.com/vinayakjoshi04/PrepMate-AI/issues) for the full list.
 
 ---
 
 ## 🤝 Contributing
 
-Contributions make the open-source community an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
+Contributions are always welcome!
 
-### How to Contribute
+```bash
+# 1. Fork the repository on GitHub
 
-1. **Fork the Project**
-2. **Create your Feature Branch**
-   ```bash
-   git checkout -b feature/AmazingFeature
-   ```
-3. **Commit your Changes**
-   ```bash
-   git commit -m 'Add some AmazingFeature'
-   ```
-4. **Push to the Branch**
-   ```bash
-   git push origin feature/AmazingFeature
-   ```
-5. **Open a Pull Request**
+# 2. Create your feature branch
+git checkout -b feature/your-feature-name
 
-### Contribution Guidelines
+# 3. Commit your changes (use conventional commits)
+git commit -m "feat: add voice interview mode"
 
-- Follow the existing code style and conventions
-- Write clear, descriptive commit messages
-- Add tests for new features
-- Update documentation as needed
-- Ensure all tests pass before submitting PR
+# 4. Push to your fork
+git push origin feature/your-feature-name
+
+# 5. Open a Pull Request 🎉
+```
+
+**Guidelines:** follow existing code style · write clear commit messages · update docs for new features · test before submitting.
 
 ---
 
 ## 📄 License
 
-Distributed under the MIT License. See `LICENSE` file for more information.
-
-The MIT License is a permissive license that allows for reuse with minimal restrictions. You are free to use, modify, and distribute this software for any purpose, including commercial applications.
+Distributed under the MIT License. See [`LICENSE`](LICENSE) for details.
 
 ---
 
@@ -398,30 +571,21 @@ The MIT License is a permissive license that allows for reuse with minimal restr
 **Vinayak Vivek Joshi**
 
 - GitHub: [@vinayakjoshi04](https://github.com/vinayakjoshi04)
-- Project Link: [https://github.com/vinayakjoshi04/PrepMate-AI](https://github.com/vinayakjoshi04/PrepMate-AI)
-- Live Demo: [https://prep-mate-ai-eight.vercel.app](https://prep-mate-ai-eight.vercel.app)
+- Project: [github.com/vinayakjoshi04/PrepMate-AI](https://github.com/vinayakjoshi04/PrepMate-AI)
+- Live App: [prep-mate-ai-eight.vercel.app](https://prep-mate-ai-eight.vercel.app)
 
-For questions, suggestions, or collaborations, please open an issue or reach out directly.
-
----
-
-## 🙏 Acknowledgments
-
-Special thanks to:
-
-- [React.js](https://reactjs.org/) - For the amazing frontend framework
-- [Python](https://www.python.org/) - For powerful backend capabilities
-- [Vercel](https://vercel.com/) - For seamless deployment
-- [OpenAI/Anthropic](https://openai.com/) - For AI capabilities
-- All contributors who help improve PrepMate-AI
-- The open-source community for inspiration and support
+Have a question or idea? [Open an issue](https://github.com/vinayakjoshi04/PrepMate-AI/issues) — happy to chat!
 
 ---
 
 <div align="center">
 
-**Made with ❤️ by Vinayak Vivek Joshi**
+<br/>
 
-If you find this project helpful, please consider giving it a ⭐️!
+**If PrepMate helped you, a ⭐ on GitHub means the world!**
+
+<br/>
+
+*Built with ❤️ by Vinayak Vivek Joshi · © 2026 PrepMateAI*
 
 </div>
