@@ -1124,3 +1124,525 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ─── APPEND TO BOTTOM OF SkillRoadmap.css ────────────── */
+
+/* ─── Loading Panel ──────────────────────────────────── */
+.sr-loading-panel {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 480px;
+  margin: 28px auto 0;
+  padding: 24px 28px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  backdrop-filter: blur(10px);
+  animation: srSlideUp 0.4s ease-out both;
+}
+
+.sr-lstep {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  transition: opacity 0.3s ease;
+}
+
+.sr-lstep--idle   { opacity: 0.3; }
+.sr-lstep--active { opacity: 1; }
+.sr-lstep--done   { opacity: 0.6; }
+
+.sr-lstep-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 18px;
+  transition: background 0.3s ease;
+}
+
+.sr-lstep--done .sr-lstep-icon {
+  background: rgba(67, 233, 123, 0.15);
+  color: #43e97b;
+}
+
+.sr-lstep--done .sr-lstep-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.sr-lstep--active .sr-lstep-icon {
+  background: rgba(102, 126, 234, 0.15);
+}
+
+.sr-lstep-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #a0aec0;
+  flex: 1;
+}
+
+.sr-lstep--active .sr-lstep-label { color: #ffffff; }
+.sr-lstep--done   .sr-lstep-label { color: #43e97b;  }
+
+.sr-lstep-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(102, 126, 234, 0.25);
+  border-top-color: #667eea;
+  border-radius: 50%;
+  animation: srSpin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+/* ─── Score Breakdown Bars ───────────────────────────── */
+.sr-breakdown-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 16px 0 20px;
+}
+
+.sr-scorebar {}
+
+.sr-scorebar-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 5px;
+}
+
+.sr-scorebar-label {
+  font-size: 12px;
+  color: #a0aec0;
+  font-weight: 500;
+}
+
+.sr-scorebar-val {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.sr-scorebar-track {
+  height: 5px;
+  background: rgba(255, 255, 255, 0.07);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.sr-scorebar-fill {
+  height: 100%;
+  border-radius: 99px;
+  transition: width 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ─── PDF Parsed Badge ───────────────────────────────── */
+.sr-file-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.sr-pdf-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #43e97b;
+  background: rgba(67, 233, 123, 0.1);
+  border: 1px solid rgba(67, 233, 123, 0.2);
+  border-radius: 20px;
+  padding: 3px 10px;
+}
+
+.sr-pdf-badge svg {
+  width: 11px;
+  height: 11px;
+}
+
+.sr-dz-highlight {
+  color: #667eea !important;
+  font-size: 11px !important;
+  margin-top: 4px;
+}
+
+/* ─── Skill proficiency pill ─────────────────────────── */
+.skill-prof-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  border: 1px solid transparent;
+  margin-left: 2px;
+}
+
+/* ─── Milestone section grouping ────────────────────── */
+.ms-section {
+  margin-bottom: 20px;
+}
+
+.ms-section:last-child { margin-bottom: 0; }
+
+/* ─── Weekly Plan Grid ───────────────────────────────── */
+.ms-weekly-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ms-week-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.ms-week-badge {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 800;
+  color: #fff;
+  flex-shrink: 0;
+  margin-top: 1px;
+  opacity: 0.9;
+}
+
+.ms-week-text {
+  font-size: 13px;
+  color: #a0aec0;
+  line-height: 1.55;
+  margin: 0;
+  padding-top: 4px;
+}
+
+/* ─── Resource type badge ────────────────────────────── */
+.res-type-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  flex-shrink: 0;
+}
+
+/* ─── Project Box ────────────────────────────────────── */
+.ms-project-box {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: rgba(102, 126, 234, 0.06);
+  border: 1px solid rgba(102, 126, 234, 0.18);
+  border-left: 3px solid #667eea;
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+
+.ms-project-box svg {
+  width: 18px;
+  height: 18px;
+  color: #667eea;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.ms-project-box p {
+  font-size: 13px;
+  color: #a0c4ff;
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* ─── Neutral chip variant ───────────────────────────── */
+.sr-chip-neutral {
+  color: #a0aec0;
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+/* ─── Col partial header ─────────────────────────────── */
+.sr-col-partial { color: #4facfe; }
+
+/* ─── APPEND TO BOTTOM OF SkillRoadmap.css ────────────── */
+
+/* ─── Loading Panel ──────────────────────────────────── */
+.sr-loading-panel {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 480px;
+  margin: 28px auto 0;
+  padding: 24px 28px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  backdrop-filter: blur(10px);
+  animation: srSlideUp 0.4s ease-out both;
+}
+
+.sr-lstep {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  transition: opacity 0.3s ease;
+}
+
+.sr-lstep--idle   { opacity: 0.3; }
+.sr-lstep--active { opacity: 1; }
+.sr-lstep--done   { opacity: 0.6; }
+
+.sr-lstep-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 18px;
+  transition: background 0.3s ease;
+}
+
+.sr-lstep--done .sr-lstep-icon {
+  background: rgba(67, 233, 123, 0.15);
+  color: #43e97b;
+}
+
+.sr-lstep--done .sr-lstep-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.sr-lstep--active .sr-lstep-icon {
+  background: rgba(102, 126, 234, 0.15);
+}
+
+.sr-lstep-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #a0aec0;
+  flex: 1;
+}
+
+.sr-lstep--active .sr-lstep-label { color: #ffffff; }
+.sr-lstep--done   .sr-lstep-label { color: #43e97b;  }
+
+.sr-lstep-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(102, 126, 234, 0.25);
+  border-top-color: #667eea;
+  border-radius: 50%;
+  animation: srSpin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+/* ─── Score Breakdown Bars ───────────────────────────── */
+.sr-breakdown-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 16px 0 20px;
+}
+
+.sr-scorebar {}
+
+.sr-scorebar-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 5px;
+}
+
+.sr-scorebar-label {
+  font-size: 12px;
+  color: #a0aec0;
+  font-weight: 500;
+}
+
+.sr-scorebar-val {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.sr-scorebar-track {
+  height: 5px;
+  background: rgba(255, 255, 255, 0.07);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.sr-scorebar-fill {
+  height: 100%;
+  border-radius: 99px;
+  transition: width 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ─── PDF Parsed Badge ───────────────────────────────── */
+.sr-file-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.sr-pdf-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #43e97b;
+  background: rgba(67, 233, 123, 0.1);
+  border: 1px solid rgba(67, 233, 123, 0.2);
+  border-radius: 20px;
+  padding: 3px 10px;
+}
+
+.sr-pdf-badge svg {
+  width: 11px;
+  height: 11px;
+}
+
+.sr-dz-highlight {
+  color: #667eea !important;
+  font-size: 11px !important;
+  margin-top: 4px;
+}
+
+/* ─── Skill proficiency pill ─────────────────────────── */
+.skill-prof-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  border: 1px solid transparent;
+  margin-left: 2px;
+}
+
+/* ─── Milestone section grouping ────────────────────── */
+.ms-section {
+  margin-bottom: 20px;
+}
+
+.ms-section:last-child { margin-bottom: 0; }
+
+/* ─── Weekly Plan Grid ───────────────────────────────── */
+.ms-weekly-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ms-week-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.ms-week-badge {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 800;
+  color: #fff;
+  flex-shrink: 0;
+  margin-top: 1px;
+  opacity: 0.9;
+}
+
+.ms-week-text {
+  font-size: 13px;
+  color: #a0aec0;
+  line-height: 1.55;
+  margin: 0;
+  padding-top: 4px;
+}
+
+/* ─── Resource type badge ────────────────────────────── */
+.res-type-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  flex-shrink: 0;
+}
+
+/* ─── Project Box ────────────────────────────────────── */
+.ms-project-box {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: rgba(102, 126, 234, 0.06);
+  border: 1px solid rgba(102, 126, 234, 0.18);
+  border-left: 3px solid #667eea;
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+
+.ms-project-box svg {
+  width: 18px;
+  height: 18px;
+  color: #667eea;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.ms-project-box p {
+  font-size: 13px;
+  color: #a0c4ff;
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* ─── Neutral chip variant ───────────────────────────── */
+.sr-chip-neutral {
+  color: #a0aec0;
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+/* ─── Col partial header ─────────────────────────────── */
+.sr-col-partial { color: #4facfe; }
+
+/* ─── Auto-filled milestone tag ─────────────────────── */
+.milestone-tag-autogen {
+  color: #f6d365;
+  background: rgba(246, 211, 101, 0.1);
+  border-color: rgba(246, 211, 101, 0.25);
+  font-size: 11px;
+}
