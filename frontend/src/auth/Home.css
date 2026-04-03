@@ -287,13 +287,13 @@
 
 .grad-text {
   display: block;
+  color: #a78bfa; /* fallback color so text is always visible */
   background: linear-gradient(135deg, #a78bfa 0%, #f093fb 40%, #43e97b 80%, #4facfe 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
   background-size: 300% 300%;
   animation: shimmer 6s ease infinite;
-  min-height: 1.15em;
 }
 
 @keyframes shimmer {
@@ -389,6 +389,15 @@
   font-weight: 500;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+}
+
+.grad-text .typewriter {
+  background: linear-gradient(135deg, #a78bfa 0%, #f093fb 40%, #43e97b 80%, #4facfe 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  background-size: 300% 300%;
+  animation: shimmer 6s ease infinite;
 }
 
 /* ── Hero Cards (Module Selector) ─────────────────── */
