@@ -76,6 +76,11 @@ export default function CreateInterview() {
   const [processingStage, setProcessingStage] = useState("");
   const [processingStep, setProcessingStep] = useState(0);
 
+  // ── Camera/mic permission checkbox state ────────────────────────────────
+  const [permissionsChecked, setPermissionsChecked] = useState(false);
+  const [permissionStatus, setPermissionStatus] = useState("idle"); // idle | checking | ok | error
+  const [permissionError, setPermissionError] = useState("");
+
   const processingSteps = [
     "Analyzing job description…",
     "Identifying key skills…",
@@ -125,9 +130,33 @@ export default function CreateInterview() {
     if (errors.rounds) setErrors(prev => ({ ...prev, rounds: "" }));
   };
 
+  // ── Camera/mic permission checkbox ──────────────────────────────────────
+  // We verify permissions here (step 3) rather than surprising the user with
+  // a browser prompt once the interview has already started. This is a
+  // simple checkbox now (not a toggle) — checking it triggers a real
+  // getUserMedia call to confirm access actually works before proceeding.
+  const handlePermissionCheckbox = async (e) => {
+    const checked = e.target.checked;
+    setPermissionsChecked(checked);
+    if (!checked) {
+      setPermissionStatus("idle");
+      return;
+    }
+    setPermissionStatus("checking");
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      stream.getTracks().forEach(t => t.stop()); // just testing permission, release immediately
+      setPermissionStatus("ok");
+    } catch (err) {
+      console.error("Permission check failed:", err);
+      setPermissionsChecked(false);
+      setPermissionStatus("error");
+      setPermissionError("Camera/mic access was blocked. Enable it in your browser settings, then check the box again.");
+    }
+  };
+
   const handleSaveDraft = () => {
     localStorage.setItem("interviewDraft", JSON.stringify({ formData, selectedRounds }));
-    // Small toast instead of alert
     const toast = document.createElement("div");
     toast.className = "toast-saved";
     toast.textContent = "✓ Draft saved";
@@ -150,6 +179,11 @@ export default function CreateInterview() {
   };
 
   const handleSubmit = async () => {
+    if (!permissionsChecked || permissionStatus !== "ok") {
+      alert("Please check the camera & microphone permission box before starting — spoken questions require it.");
+      return;
+    }
+
     setLoading(true);
     let stepIdx = 0;
     const interval = setInterval(() => {
@@ -205,8 +239,8 @@ export default function CreateInterview() {
     return (
       <div className="create-interview-container loading-screen">
         <div className="loading-content">
-          <div className="loading-icon">🤖</div>
-          <h2>Crafting Your Interview</h2>
+          <div className="loading-icon" />
+          <h2>Preparing Your Interview</h2>
           <p className="loading-subtitle">{processingStage}</p>
           <div className="loading-steps">
             {processingSteps.map((s, i) => (
@@ -257,14 +291,14 @@ export default function CreateInterview() {
             </svg>
           </div>
           <h1>
-            {step === 1 ? "Set Up Your Interview" :
-             step === 2 ? "Define the Scope" :
-             "Fine-Tune Preferences"}
+            {step === 1 ? "Set up your interview" :
+             step === 2 ? "Define the scope" :
+             "Fine-tune preferences"}
           </h1>
           <p>
             {step === 1 ? "Tell us about the role you're preparing for" :
              step === 2 ? "Paste the job description and choose your rounds" :
-             "Customize difficulty, question count, and focus areas"}
+             "Customize difficulty, question count, and camera access"}
           </p>
         </div>
 
@@ -411,6 +445,44 @@ export default function CreateInterview() {
                 </div>
               </div>
 
+              {/* ── Camera & Mic permission checkbox ── */}
+              <div className="form-section">
+                <label className="form-label">
+                  Camera & Microphone Access <span className="required">*</span>
+                </label>
+                <p className="form-hint">
+                  Spoken questions are recorded on your webcam so PrepMate can analyze eye
+                  contact, posture, and vocal delivery alongside your answer content.
+                  Coding questions use a text editor instead and don't need your camera.
+                </p>
+                <label className={`permission-check-card ${permissionStatus}`}>
+                  <input
+                    type="checkbox"
+                    checked={permissionsChecked}
+                    onChange={handlePermissionCheckbox}
+                  />
+                  <span className="permission-checkbox-custom">
+                    {permissionStatus === "ok" ? "✓" : ""}
+                  </span>
+                  <div className="permission-check-body">
+                    <div className="permission-check-title">
+                      I allow camera & microphone access for this interview
+                    </div>
+                    <div className="permission-check-sub">
+                      {permissionStatus === "checking" && "Requesting permission…"}
+                      {permissionStatus === "ok" && "✅ Camera & mic verified — you're ready to record"}
+                      {permissionStatus === "error" && (
+                        <span className="permission-error">{permissionError}</span>
+                      )}
+                      {permissionStatus === "idle" && "Nothing is recorded now — this just confirms access works"}
+                    </div>
+                  </div>
+                </label>
+                {!permissionsChecked && (
+                  <span className="error-text">Required to start a video interview</span>
+                )}
+              </div>
+
               <div className="form-section">
                 <label htmlFor="customNotes" className="form-label">
                   Additional Notes <span className="optional">(Optional)</span>
@@ -449,19 +521,6 @@ export default function CreateInterview() {
           </div>
         </div>
       </main>
-
-      <style>{`
-        .toast-saved {
-          position: fixed; bottom: 24px; right: 24px;
-          background: #22d3a5; color: #0d1117; padding: 10px 20px;
-          border-radius: 8px; font-weight: 700; font-size: 14px;
-          box-shadow: 0 4px 20px rgba(34,211,165,0.4);
-          animation: toastIn 0.3s ease, toastOut 0.3s ease 1.7s forwards;
-          z-index: 9999;
-        }
-        @keyframes toastIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
-        @keyframes toastOut { to { opacity:0; transform:translateY(10px); } }
-      `}</style>
     </div>
   );
 }

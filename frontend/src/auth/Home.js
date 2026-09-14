@@ -148,17 +148,58 @@ const steps = [
   { num: "04", title: "Land the Offer", desc: "Get shortlisted, chat directly with recruiters, and walk into interviews already prepared.", icon: "★" },
 ];
 
-const testimonials = [
-  { init: "SR", name: "Sarah Rodriguez", role: "SWE @ Google", grad: "135deg,#667eea,#764ba2", text: "PrepMate's AI interview gave me tougher questions than the actual Google panel. I walked in completely prepared." },
-  { init: "MC", name: "Michael Chen", role: "PM @ Microsoft", grad: "135deg,#f093fb,#f5576c", text: "The resume analyzer found 14 keyword gaps I had no idea about. Got 3 interview callbacks in a single week." },
-  { init: "AP", name: "Aisha Patel", role: "Consultant @ McKinsey", grad: "135deg,#43e97b,#38f9d7", text: "The skill roadmap told me exactly what to learn. I followed it for 30 days and landed my McKinsey offer." },
-  { init: "RK", name: "Rahul Kumar", role: "SDE @ Amazon", grad: "135deg,#f7971e,#ffd200", text: "A recruiter found me through the PrepMate Job Board and reached out within 2 days. Got the job 3 weeks later." },
+const whyUs = [
+  {
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
+      </svg>
+    ),
+    title: "End-to-End Coverage",
+    desc: "Interview prep, resume review, skill planning, and job discovery — one connected workflow instead of five disconnected tools.",
+    color: "#667eea",
+    accent: "#764ba2",
+  },
+  {
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    ),
+    title: "Built on Real Hiring Signals",
+    desc: "Our scoring models are grounded in ATS behavior and role-specific question banks, not generic templates.",
+    color: "#f093fb",
+    accent: "#f5576c",
+  },
+  {
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+      </svg>
+    ),
+    title: "Your Data Stays Yours",
+    desc: "Your resume and profile are only visible to recruiters when you choose to be discoverable — nothing is shared by default.",
+    color: "#43e97b",
+    accent: "#38f9d7",
+  },
+  {
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+      </svg>
+    ),
+    title: "Always Improving",
+    desc: "Question banks, feedback models, and roadmaps are updated continuously as hiring trends and job descriptions shift.",
+    color: "#f7971e",
+    accent: "#ffd200",
+  },
 ];
 
 export default function Home() {
   const [heroRef, heroVisible] = useIntersection();
   const [modulesRef, modulesVisible] = useIntersection();
   const [stepsRef, stepsVisible] = useIntersection();
+  const [whyRef, whyVisible] = useIntersection();
   const [ctaRef, ctaVisible] = useIntersection();
   const [activeModule, setActiveModule] = useState(0);
   const [scrollY, setScrollY] = useState(0);
@@ -210,11 +251,11 @@ export default function Home() {
           <div className="nav-links">
             <a href="#modules" className="nav-link">Modules</a>
             <a href="#how" className="nav-link">How it Works</a>
-            <a href="#reviews" className="nav-link">Reviews</a>
+            <a href="#why" className="nav-link">Why PrepMate</a>
           </div>
           <div className="nav-actions">
             <Link to="/login" className="nav-ghost">Sign In</Link>
-            <Link to="/signup" className="nav-pill">Get Started →</Link>
+            <Link to="/signup" className="nav-pill">Get Started</Link>
           </div>
         </div>
       </nav>
@@ -224,7 +265,7 @@ export default function Home() {
         <div className={`hero-inner ${heroVisible ? "revealed" : ""}`}>
           <div className="hero-eyebrow">
             <span className="dot-live" />
-            Trusted by 50,000+ job seekers worldwide
+            AI-powered career preparation, all in one place
           </div>
           <h1 className="hero-h1">
             Your AI-Powered<br />
@@ -243,9 +284,9 @@ export default function Home() {
           <div className="hero-stats">
             {[
               ["5", "AI Modules"],
-              ["50K+", "Users Trained"],
-              ["98%", "Success Rate"],
-              ["4.9★", "App Rating"],
+              ["1", "Unified Platform"],
+              ["24/7", "AI Availability"],
+              ["0", "Setup Cost"],
             ].map(([num, lbl]) => (
               <div key={lbl} className="hero-stat">
                 <span className="stat-val">{num}</span>
@@ -434,23 +475,21 @@ export default function Home() {
         </div>
       </section>
 
-      {/* SOCIAL PROOF */}
-      <section className="proof-section" id="reviews">
-        <div className="section-label" style={{ textAlign: "center" }}>Real Results</div>
-        <h2 className="section-h2" style={{ opacity: 1, transform: "none" }}>50,000+ Offers and Counting</h2>
-        <p className="section-sub">From FAANG to consulting to startups — PrepMate users are landing everywhere.</p>
-        <div className="proof-inner">
-          {testimonials.map((t, i) => (
-            <div key={t.name} className="proof-card" style={{ animationDelay: `${i * 0.1}s` }}>
-              <div className="proof-stars">★★★★★</div>
-              <p className="proof-text">"{t.text}"</p>
-              <div className="proof-author">
-                <div className="proof-avatar" style={{ background: `linear-gradient(${t.grad})` }}>{t.init}</div>
-                <div>
-                  <div className="proof-name">{t.name}</div>
-                  <div className="proof-role">{t.role}</div>
-                </div>
-              </div>
+      {/* WHY PREPMATE */}
+      <section className="why-section" id="why" ref={whyRef}>
+        <div className="section-label" style={{ textAlign: "center" }}>Why PrepMate</div>
+        <h2 className={`section-h2 ${whyVisible ? "revealed" : ""}`}>Built to Actually Get You Hired</h2>
+        <p className="section-sub">No filler, no fluff — just the tools that move you from applying to interviewing.</p>
+        <div className="why-inner">
+          {whyUs.map((item, i) => (
+            <div
+              key={item.title}
+              className={`why-card ${whyVisible ? "revealed" : ""}`}
+              style={{ "--mod-color": item.color, "--mod-accent": item.accent, animationDelay: `${i * 0.1}s` }}
+            >
+              <div className="why-icon">{item.icon}</div>
+              <h4 className="why-title">{item.title}</h4>
+              <p className="why-desc">{item.desc}</p>
             </div>
           ))}
         </div>
@@ -462,7 +501,7 @@ export default function Home() {
           <div className="fcta-orb" />
           <div className="section-label">Your Next Chapter Starts Now</div>
           <h2 className="fcta-h2">Ready to Get Hired?</h2>
-          <p className="fcta-sub">Join 50,000+ professionals who used PrepMate AI to land their dream roles. 5 modules. Zero excuses.</p>
+          <p className="fcta-sub">Join PrepMate and put five AI-powered tools to work on your job search. Zero excuses.</p>
           <div className="fcta-modules-row">
             {modules.map((m) => (
               <div key={m.id} className="fcta-module-chip" style={{ "--mod-color": m.color }}>

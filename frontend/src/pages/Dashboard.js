@@ -1,7 +1,28 @@
 import { supabase } from "../supabaseClient";
 import { useNavigate } from "react-router-dom";
-import { createElement as h, useState, useEffect, useCallback } from "react";
+import { createElement as h, useState, useEffect, useCallback, useRef } from "react";
 import "./dashboard.css";
+
+/* ─── helpers ─────────────────────────────────────────
+   Small pure helpers pulled out of the component bodies
+   so the same logic isn't duplicated in three places. */
+const titleCase = (str) =>
+  str ? str.charAt(0).toUpperCase() + str.slice(1) : str;
+
+const nameFromEmail = (email) => {
+  if (!email) return null;
+  return email
+    .split("@")[0]
+    .split(/[._-]/)
+    .map(titleCase)
+    .join(" ");
+};
+
+const companyFromEmail = (email) => {
+  if (!email) return null;
+  const domain = email.split("@")[1]?.split(".")[0];
+  return domain ? titleCase(domain) : null;
+};
 
 /* ─── Resume Upload Modal ────────────────────────────── */
 function ResumeUploadModal({ user, onClose, onSuccess }) {
@@ -21,7 +42,9 @@ function ResumeUploadModal({ user, onClose, onSuccess }) {
 
   const handleFile = (f) => {
     if (!f) return;
-    if (f.type !== "application/pdf" && !f.name.endsWith(".pdf")) {
+    const isPdfExt = f.name.toLowerCase().endsWith(".pdf");
+    const isPdfMime = f.type === "application/pdf";
+    if (!isPdfExt || (f.type && !isPdfMime)) {
       setErrorMsg("Only PDF files are accepted.");
       return;
     }
@@ -41,7 +64,7 @@ function ResumeUploadModal({ user, onClose, onSuccess }) {
   };
 
   const handleSubmit = async () => {
-    if (!form.candidate_name || !form.role) {
+    if (!form.candidate_name.trim() || !form.role.trim()) {
       setErrorMsg("Name and desired role are required.");
       return;
     }
@@ -55,7 +78,7 @@ function ResumeUploadModal({ user, onClose, onSuccess }) {
         const path = `${user.id}/${Date.now()}.${ext}`;
         const { error: storageError } = await supabase.storage
           .from("resumes")
-          .upload(path, file, { upsert: true, contentType: file.type });
+          .upload(path, file, { upsert: true, contentType: file.type || "application/pdf" });
         if (storageError) throw new Error(storageError.message);
         resume_url = path;
         resume_filename = file.name;
@@ -66,10 +89,10 @@ function ResumeUploadModal({ user, onClose, onSuccess }) {
         .upsert({
           candidate_id: user.id,
           candidate_email: user.email,
-          candidate_name: form.candidate_name,
-          college: form.college,
-          role: form.role,
-          location: form.location,
+          candidate_name: form.candidate_name.trim(),
+          college: form.college.trim(),
+          role: form.role.trim(),
+          location: form.location.trim(),
           experience: form.experience,
           skills: skillsArray,
           visible_to_recruiters: form.visible_to_recruiters,
@@ -80,7 +103,7 @@ function ResumeUploadModal({ user, onClose, onSuccess }) {
       setStep("done");
       setTimeout(() => { onSuccess?.(); onClose(); }, 1800);
     } catch (err) {
-      setErrorMsg(err.message || "Something went wrong.");
+      setErrorMsg(err.message || "Something went wrong. Please try again.");
       setStep("form");
     }
   };
@@ -88,10 +111,10 @@ function ResumeUploadModal({ user, onClose, onSuccess }) {
   const experienceOpts = ["Fresher", "Intern", "1 yr", "2 yr", "3+ yr"];
 
   if (step === "done") {
-    return h("div", { className: "ru-overlay", onClick: onClose },
+    return h("div", { className: "ru-overlay", role: "dialog", "aria-modal": "true", onClick: onClose },
       h("div", { className: "ru-modal", onClick: e => e.stopPropagation() },
         h("div", { className: "ru-done-state" },
-          h("div", { className: "ru-done-icon" }, "✓"),
+          h("div", { className: "ru-done-icon", "aria-hidden": "true" }, "✓"),
           h("h3", null, "Profile Saved!"),
           h("p", null, "Recruiters on PrepMate can now discover your profile.")
         )
@@ -100,10 +123,10 @@ function ResumeUploadModal({ user, onClose, onSuccess }) {
   }
 
   if (step === "uploading") {
-    return h("div", { className: "ru-overlay", onClick: onClose },
+    return h("div", { className: "ru-overlay", role: "dialog", "aria-modal": "true", "aria-busy": "true", onClick: onClose },
       h("div", { className: "ru-modal", onClick: e => e.stopPropagation() },
         h("div", { className: "ru-done-state" },
-          h("div", { className: "ru-spinner" }),
+          h("div", { className: "ru-spinner", role: "status", "aria-label": "Saving" }),
           h("h3", null, "Saving your profile..."),
           h("p", null, "This will just take a moment.")
         )
@@ -111,81 +134,97 @@ function ResumeUploadModal({ user, onClose, onSuccess }) {
     );
   }
 
-  return h("div", { className: "ru-overlay", onClick: onClose },
+  return h("div", { className: "ru-overlay", role: "dialog", "aria-modal": "true", "aria-labelledby": "ru-title", onClick: onClose },
     h("div", { className: "ru-modal", onClick: e => e.stopPropagation() },
       h("div", { className: "ru-modal-header" },
         h("div", null,
-          h("h2", { className: "ru-modal-title" }, "Upload Your Resume"),
+          h("h2", { className: "ru-modal-title", id: "ru-title" }, "Upload Your Resume"),
           h("p", { className: "ru-modal-sub" }, "Make your profile visible to top recruiters on PrepMate")
         ),
-        h("button", { className: "ru-close-btn", onClick: onClose }, "✕")
+        h("button", { type: "button", className: "ru-close-btn", "aria-label": "Close dialog", onClick: onClose }, "✕")
       ),
       h("div", { className: "ru-modal-body" },
         h("div", {
           className: `ru-dropzone ${dragOver ? "ru-dropzone-over" : ""} ${file ? "ru-dropzone-filled" : ""}`,
+          role: "button",
+          tabIndex: 0,
+          "aria-label": "Upload resume PDF",
           onDragOver: e => { e.preventDefault(); setDragOver(true); },
           onDragLeave: () => setDragOver(false),
           onDrop: handleDrop,
           onClick: () => document.getElementById("ru-file-input").click(),
+          onKeyDown: e => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              document.getElementById("ru-file-input").click();
+            }
+          },
         },
           h("input", {
-            id: "ru-file-input", type: "file", accept: ".pdf", style: { display: "none" },
+            id: "ru-file-input", type: "file", accept: ".pdf,application/pdf", style: { display: "none" },
             onChange: e => handleFile(e.target.files[0])
           }),
           file
             ? h("div", { className: "ru-file-info" },
-                h("div", { className: "ru-file-icon" }, "📄"),
+                h("div", { className: "ru-file-icon", "aria-hidden": "true" }, "📄"),
                 h("div", null,
                   h("div", { className: "ru-file-name" }, file.name),
                   h("div", { className: "ru-file-size" }, `${(file.size / 1024).toFixed(0)} KB`)
                 ),
                 h("button", {
+                  type: "button",
                   className: "ru-file-remove",
+                  "aria-label": "Remove file",
                   onClick: e => { e.stopPropagation(); setFile(null); }
                 }, "✕")
               )
             : h("div", { className: "ru-dropzone-inner" },
-                h("div", { className: "ru-drop-icon" }, "☁"),
+                h("div", { className: "ru-drop-icon", "aria-hidden": "true" }, "☁"),
                 h("div", { className: "ru-drop-text" }, "Drop your PDF here or click to browse"),
                 h("div", { className: "ru-drop-hint" }, "PDF only · Max 5 MB · (Optional)")
               )
         ),
         h("div", { className: "ru-form-grid" },
           h("div", { className: "ru-field" },
-            h("label", null, "Full Name *"),
+            h("label", { htmlFor: "ru-name" }, "Full Name *"),
             h("input", {
+              id: "ru-name",
               placeholder: "Your full name",
               value: form.candidate_name,
               onChange: e => setForm(f => ({ ...f, candidate_name: e.target.value }))
             })
           ),
           h("div", { className: "ru-field" },
-            h("label", null, "Desired Role *"),
+            h("label", { htmlFor: "ru-role" }, "Desired Role *"),
             h("input", {
+              id: "ru-role",
               placeholder: "e.g. Frontend Developer",
               value: form.role,
               onChange: e => setForm(f => ({ ...f, role: e.target.value }))
             })
           ),
           h("div", { className: "ru-field" },
-            h("label", null, "College / University"),
+            h("label", { htmlFor: "ru-college" }, "College / University"),
             h("input", {
+              id: "ru-college",
               placeholder: "e.g. IIT Bombay",
               value: form.college,
               onChange: e => setForm(f => ({ ...f, college: e.target.value }))
             })
           ),
           h("div", { className: "ru-field" },
-            h("label", null, "Location"),
+            h("label", { htmlFor: "ru-location" }, "Location"),
             h("input", {
+              id: "ru-location",
               placeholder: "e.g. Bengaluru",
               value: form.location,
               onChange: e => setForm(f => ({ ...f, location: e.target.value }))
             })
           ),
           h("div", { className: "ru-field" },
-            h("label", null, "Experience"),
+            h("label", { htmlFor: "ru-experience" }, "Experience"),
             h("select", {
+              id: "ru-experience",
               value: form.experience,
               onChange: e => setForm(f => ({ ...f, experience: e.target.value }))
             },
@@ -193,8 +232,9 @@ function ResumeUploadModal({ user, onClose, onSuccess }) {
             )
           ),
           h("div", { className: "ru-field ru-field-full" },
-            h("label", null, "Skills ", h("span", { className: "ru-label-hint" }, "(comma-separated)")),
+            h("label", { htmlFor: "ru-skills" }, "Skills ", h("span", { className: "ru-label-hint" }, "(comma-separated)")),
             h("input", {
+              id: "ru-skills",
               placeholder: "React, Node.js, Python, Figma...",
               value: form.skills,
               onChange: e => setForm(f => ({ ...f, skills: e.target.value }))
@@ -208,26 +248,36 @@ function ResumeUploadModal({ user, onClose, onSuccess }) {
           ),
           h("div", {
             className: `ru-toggle ${form.visible_to_recruiters ? "ru-toggle-on" : ""}`,
-            onClick: () => setForm(f => ({ ...f, visible_to_recruiters: !f.visible_to_recruiters }))
+            role: "switch",
+            "aria-checked": form.visible_to_recruiters,
+            tabIndex: 0,
+            onClick: () => setForm(f => ({ ...f, visible_to_recruiters: !f.visible_to_recruiters })),
+            onKeyDown: e => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                setForm(f => ({ ...f, visible_to_recruiters: !f.visible_to_recruiters }));
+              }
+            },
           })
         ),
-        errorMsg && h("div", { className: "ru-error" }, errorMsg)
+        errorMsg && h("div", { className: "ru-error", role: "alert" }, errorMsg)
       ),
       h("div", { className: "ru-modal-footer" },
-        h("button", { className: "ru-btn-ghost", onClick: onClose }, "Cancel"),
-        h("button", { className: "ru-btn-primary", onClick: handleSubmit }, "Save Profile & Upload")
+        h("button", { type: "button", className: "ru-btn-ghost", onClick: onClose }, "Cancel"),
+        h("button", { type: "button", className: "ru-btn-primary", onClick: handleSubmit }, "Save Profile & Upload")
       )
     )
   );
 }
 
-/* ─── NEW: Chat / Messaging Modal ───────────────────── */
+/* ─── Chat / Messaging Modal ───────────────────────── */
 function ChatModal({ invite, user, onClose }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
   const [recruiterInfo, setRecruiterInfo] = useState(null);
+  const scrollRef = useRef(null);
 
   const fetchMessages = useCallback(async () => {
     const { data } = await supabase
@@ -239,25 +289,19 @@ function ChatModal({ invite, user, onClose }) {
     setLoading(false);
   }, [invite.id]);
 
-  // NEW: Fetch recruiter information
   const fetchRecruiterInfo = useCallback(async () => {
     if (!invite.recruiter_id) return;
-    
     const { data } = await supabase
       .from("recruiters")
       .select("company_name, full_name")
       .eq("id", invite.recruiter_id)
       .maybeSingle();
-    
-    if (data) {
-      setRecruiterInfo(data);
-    }
+    if (data) setRecruiterInfo(data);
   }, [invite.recruiter_id]);
 
   useEffect(() => {
     fetchMessages();
     fetchRecruiterInfo();
-    // Real-time subscription
     const channel = supabase
       .channel(`chat:${invite.id}`)
       .on("postgres_changes", {
@@ -272,7 +316,13 @@ function ChatModal({ invite, user, onClose }) {
     return () => supabase.removeChannel(channel);
   }, [fetchMessages, fetchRecruiterInfo, invite.id]);
 
-  // Mark invite as read when candidate opens chat
+  // Auto-scroll to the latest message whenever the list changes.
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [messages, loading]);
+
   useEffect(() => {
     if (invite.status === "pending") {
       supabase.from("interview_invites")
@@ -283,16 +333,20 @@ function ChatModal({ invite, user, onClose }) {
   }, [invite.id, invite.status]);
 
   const handleSend = async () => {
-    if (!input.trim()) return;
-    setSending(true);
     const text = input.trim();
+    if (!text || sending) return;
+    setSending(true);
     setInput("");
-    await supabase.from("invite_messages").insert({
+    const { error } = await supabase.from("invite_messages").insert({
       invite_id: invite.id,
       sender_id: user.id,
       sender_role: "candidate",
       content: text,
     });
+    if (error) {
+      // restore the draft so the message isn't silently lost
+      setInput(text);
+    }
     setSending(false);
   };
 
@@ -303,100 +357,69 @@ function ChatModal({ invite, user, onClose }) {
     }
   };
 
-  // Get recruiter display name and company
-  const getRecruiterDisplayName = () => {
-    if (recruiterInfo?.full_name) return recruiterInfo.full_name;
-    if (invite.recruiter_email) {
-      return invite.recruiter_email.split("@")[0]
-        .split(/[._-]/)
-        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-        .join(" ");
-    }
-    return "Recruiter";
-  };
-
-  const getCompanyName = () => {
-    if (recruiterInfo?.company_name) return recruiterInfo.company_name;
-    if (invite.recruiter_email) {
-      const domain = invite.recruiter_email.split("@")[1]?.split(".")[0] || "Company";
-      return domain.charAt(0).toUpperCase() + domain.slice(1);
-    }
-    return "Company";
-  };
-
-  const recruiterName = getRecruiterDisplayName();
-  const companyName = getCompanyName();
+  const recruiterName = recruiterInfo?.full_name || nameFromEmail(invite.recruiter_email) || "Recruiter";
+  const companyName = recruiterInfo?.company_name || companyFromEmail(invite.recruiter_email) || "Company";
   const jobTitle = invite.job_posts?.title || "Interview Opportunity";
 
-  return h("div", { className: "chat-overlay", onClick: onClose },
+  return h("div", { className: "chat-overlay", role: "dialog", "aria-modal": "true", onClick: onClose },
     h("div", { className: "chat-modal", onClick: e => e.stopPropagation() },
-      // Header
       h("div", { className: "chat-header" },
         h("div", { className: "chat-header-left" },
-          h("div", { className: "chat-avatar" },
-            recruiterName.charAt(0).toUpperCase()
-          ),
+          h("div", { className: "chat-avatar", "aria-hidden": "true" }, recruiterName.charAt(0).toUpperCase()),
           h("div", null,
             h("div", { className: "chat-header-name" }, recruiterName),
             h("div", { className: "chat-header-role" }, `${companyName} · ${jobTitle}`)
           )
         ),
-        h("button", { className: "ru-close-btn", onClick: onClose }, "✕")
+        h("button", { type: "button", className: "ru-close-btn", "aria-label": "Close chat", onClick: onClose }, "✕")
       ),
-
-      // Invite context banner
       h("div", { className: "chat-invite-banner" },
-        h("div", { className: "chat-invite-icon" }, "💼"),
+        h("div", { className: "chat-invite-icon", "aria-hidden": "true" }, "💼"),
         h("div", null,
           h("div", { className: "chat-invite-title" }, jobTitle),
           h("div", { className: "chat-invite-sub" }, `Interview invitation from ${companyName}`)
         )
       ),
-
-      // Messages (rest remains the same)
-      h("div", { className: "chat-messages", id: "chat-scroll" },
+      h("div", { className: "chat-messages", ref: scrollRef },
         loading
-          ? h("div", { className: "chat-loading" },
-              h("div", { className: "ru-spinner" })
-            )
+          ? h("div", { className: "chat-loading" }, h("div", { className: "ru-spinner", role: "status", "aria-label": "Loading messages" }))
           : messages.length === 0
             ? h("div", { className: "chat-empty" },
-                h("div", { className: "chat-empty-icon" }, "💬"),
+                h("div", { className: "chat-empty-icon", "aria-hidden": "true" }, "💬"),
                 h("p", null, "Start the conversation by replying to the invite below")
               )
-            : messages.map((msg, i) => {
+            : messages.map((msg) => {
                 const isCandidate = msg.sender_role === "candidate";
                 return h("div", {
-                  key: msg.id || i,
+                  key: msg.id,
                   className: `chat-bubble-wrap ${isCandidate ? "chat-bubble-right" : "chat-bubble-left"}`
                 },
-                  h("div", { className: `chat-bubble ${isCandidate ? "chat-bubble-me" : "chat-bubble-them"}` },
-                    msg.content
-                  ),
+                  h("div", { className: `chat-bubble ${isCandidate ? "chat-bubble-me" : "chat-bubble-them"}` }, msg.content),
                   h("div", { className: "chat-bubble-time" },
                     new Date(msg.created_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })
                   )
                 );
               })
       ),
-
-      // Input (rest remains the same)
       h("div", { className: "chat-input-row" },
         h("textarea", {
           className: "chat-input",
           placeholder: "Type your message… (Enter to send)",
+          "aria-label": "Message",
           value: input,
           onChange: e => setInput(e.target.value),
           onKeyDown: handleKeyDown,
           rows: 2,
         }),
         h("button", {
+          type: "button",
           className: `chat-send-btn ${sending ? "chat-send-sending" : ""}`,
+          "aria-label": "Send message",
           onClick: handleSend,
           disabled: sending || !input.trim(),
         },
           sending
-            ? h("div", { className: "ru-spinner", style: { width: "18px", height: "18px", borderWidth: "2px" } })
+            ? h("div", { className: "ru-spinner ru-spinner-sm", role: "status", "aria-label": "Sending" })
             : h("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", width: "20", height: "20" },
                 h("line", { x1: "22", y1: "2", x2: "11", y2: "13" }),
                 h("polygon", { points: "22 2 15 22 11 13 2 9 22 2" })
@@ -407,42 +430,36 @@ function ChatModal({ invite, user, onClose }) {
   );
 }
 
-/* ─── NEW: Invites Panel ─────────────────────────────── */
+/* ─── Invites Panel (list used inside Jobs tab) ──────── */
 function InvitesPanel({ invites, loading, onOpenChat, onDecline }) {
   if (loading) {
     return h("div", { className: "invites-loading" },
-      h("div", { className: "ru-spinner", style: { width: "28px", height: "28px" } })
+      h("div", { className: "ru-spinner ru-spinner-md", role: "status", "aria-label": "Loading invites" })
     );
   }
 
   if (invites.length === 0) {
     return h("div", { className: "invites-empty" },
-      h("div", { className: "invites-empty-icon" }, "📭"),
+      h("div", { className: "invites-empty-icon", "aria-hidden": "true" }, "📭"),
       h("h4", null, "No invites yet"),
       h("p", null, "Once a recruiter invites you, it will appear here.")
     );
   }
 
   return h("div", { className: "invites-list" },
-    invites.map(invite =>
-      h("div", {
+    invites.map(invite => {
+      const company = companyFromEmail(invite.recruiter_email) || "Company";
+      return h("div", {
         key: invite.id,
         className: `invite-item ${invite.status === "pending" ? "invite-item-new" : ""}`
       },
-        // Status dot
-        invite.status === "pending" && h("div", { className: "invite-unread-dot" }),
-
+        invite.status === "pending" && h("div", { className: "invite-unread-dot", "aria-hidden": "true" }),
         h("div", { className: "invite-item-left" },
-          h("div", { className: "invite-company-av" },
+          h("div", { className: "invite-company-av", "aria-hidden": "true" },
             (invite.recruiter_email?.split("@")[1]?.charAt(0) || "R").toUpperCase()
           ),
           h("div", null,
-            h("div", { className: "invite-company-name" },
-              (() => {
-                const domain = invite.recruiter_email?.split("@")[1]?.split(".")[0] || "Company";
-                return domain.charAt(0).toUpperCase() + domain.slice(1);
-              })()
-            ),
+            h("div", { className: "invite-company-name" }, company),
             h("div", { className: "invite-job-title" }, invite.job_posts?.title || "Interview Opportunity"),
             h("div", { className: "invite-preview" }, invite.message?.slice(0, 80) + (invite.message?.length > 80 ? "…" : "")),
             h("div", { className: "invite-time" },
@@ -450,34 +467,32 @@ function InvitesPanel({ invites, loading, onOpenChat, onDecline }) {
             )
           )
         ),
-
         h("div", { className: "invite-item-actions" },
-          h("span", {
-            className: `invite-status-badge invite-status-${invite.status}`
-          }, invite.status === "pending" ? "New" : invite.status === "accepted" ? "Replied" : "Declined"),
-          h("button", {
-            className: "invite-reply-btn",
-            onClick: () => onOpenChat(invite)
-          }, "💬 Reply"),
+          h("span", { className: `invite-status-badge invite-status-${invite.status}` },
+            invite.status === "pending" ? "New" : invite.status === "accepted" ? "Replied" : "Declined"
+          ),
+          h("button", { type: "button", className: "invite-reply-btn", onClick: () => onOpenChat(invite) }, "💬 Reply"),
           invite.status === "pending" && h("button", {
+            type: "button",
             className: "invite-decline-btn",
             onClick: () => onDecline(invite.id)
           }, "Decline")
         )
-      )
-    )
+      );
+    })
   );
 }
 
+/* ─── Job Board Section ───────────────────────────────── */
 function JobBoardSection({ jobs, loading, onApply, appliedJobIds = [] }) {
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [expanded, setExpanded] = useState(null);
- 
+
   const types = ["all", "Full-time", "Part-time", "Internship", "Contract", "Freelance"];
- 
+
   const filtered = jobs.filter(j => {
-    const q = search.toLowerCase();
+    const q = search.trim().toLowerCase();
     const matchesSearch =
       !q ||
       (j.title || "").toLowerCase().includes(q) ||
@@ -487,75 +502,59 @@ function JobBoardSection({ jobs, loading, onApply, appliedJobIds = [] }) {
     const matchesType = typeFilter === "all" || j.type === typeFilter;
     return matchesSearch && matchesType && j.active !== false;
   });
- 
+
   if (loading) {
     return h("div", { className: "jb-loading" },
-      h("div", { className: "ru-spinner", style: { width: "32px", height: "32px" } }),
+      h("div", { className: "ru-spinner ru-spinner-lg", role: "status", "aria-label": "Loading job posts" }),
       h("p", null, "Loading job posts…")
     );
   }
- 
+
   return h("div", { className: "jb-wrap" },
- 
-    // ── Toolbar
     h("div", { className: "jb-toolbar" },
       h("div", { className: "jb-search-wrap" },
-        h("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", className: "jb-search-icon" },
+        h("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", className: "jb-search-icon", "aria-hidden": "true" },
           h("circle", { cx: "11", cy: "11", r: "8" }),
           h("line", { x1: "21", y1: "21", x2: "16.65", y2: "16.65" })
         ),
         h("input", {
           className: "jb-search-input",
           placeholder: "Search by title, skill, or location…",
+          "aria-label": "Search jobs",
           value: search,
           onChange: e => setSearch(e.target.value),
         }),
-        search && h("button", {
-          className: "jb-search-clear",
-          onClick: () => setSearch(""),
-        }, "✕")
+        search && h("button", { type: "button", className: "jb-search-clear", "aria-label": "Clear search", onClick: () => setSearch("") }, "✕")
       ),
-      h("div", { className: "jb-type-pills" },
+      h("div", { className: "jb-type-pills", role: "group", "aria-label": "Filter by job type" },
         types.map(t =>
           h("button", {
+            type: "button",
             key: t,
             className: `jb-type-pill ${typeFilter === t ? "jb-type-pill-active" : ""}`,
+            "aria-pressed": typeFilter === t,
             onClick: () => setTypeFilter(t),
           }, t === "all" ? "All Types" : t)
         )
       )
     ),
- 
-    // ── Results count
     h("div", { className: "jb-count" },
       filtered.length === 0
         ? "No jobs match your filters"
         : `${filtered.length} open position${filtered.length !== 1 ? "s" : ""}`
     ),
- 
-    // ── Cards
     filtered.length === 0
       ? h("div", { className: "jb-empty" },
-          h("div", { className: "jb-empty-icon" }, "🔍"),
+          h("div", { className: "jb-empty-icon", "aria-hidden": "true" }, "🔍"),
           h("h4", null, "No openings found"),
           h("p", null, "Try adjusting your search or filters.")
         )
       : h("div", { className: "jb-list" },
           filtered.map(job =>
-            h("div", {
-              key: job.id,
-              className: `jb-card ${expanded === job.id ? "jb-card-expanded" : ""}`,
-            },
-              // Card Header
+            h("div", { key: job.id, className: `jb-card ${expanded === job.id ? "jb-card-expanded" : ""}` },
               h("div", { className: "jb-card-header" },
                 h("div", { className: "jb-card-left" },
-                  h("div", { className: "jb-company-av" },
-                    (() => {
-                      // Try to derive initial from recruiter email domain or title
-                      const letter = (job.company_name || job.title || "J").charAt(0).toUpperCase();
-                      return letter;
-                    })()
-                  ),
+                  h("div", { className: "jb-company-av", "aria-hidden": "true" }, (job.company_name || job.title || "J").charAt(0).toUpperCase()),
                   h("div", null,
                     h("div", { className: "jb-job-title" }, job.title),
                     h("div", { className: "jb-job-meta" },
@@ -568,15 +567,13 @@ function JobBoardSection({ jobs, loading, onApply, appliedJobIds = [] }) {
                       job.salary && h("span", { className: "jb-salary" }, job.salary)
                     ),
                     h("div", { className: "jb-tags" },
-                      (job.tags || []).slice(0, 4).map((tag, i) =>
-                        h("span", { key: i, className: "jb-tag" }, tag)
-                      )
+                      (job.tags || []).slice(0, 4).map((tag, i) => h("span", { key: i, className: "jb-tag" }, tag))
                     )
                   )
                 ),
                 h("div", { className: "jb-card-right" },
                   job.deadline && h("div", { className: "jb-deadline" },
-                    h("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", width: "12", height: "12" },
+                    h("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", width: "12", height: "12", "aria-hidden": "true" },
                       h("rect", { x: "3", y: "4", width: "18", height: "18", rx: "2" }),
                       h("line", { x1: "16", y1: "2", x2: "16", y2: "6" }),
                       h("line", { x1: "8", y1: "2", x2: "8", y2: "6" }),
@@ -588,13 +585,13 @@ function JobBoardSection({ jobs, loading, onApply, appliedJobIds = [] }) {
                     new Date(job.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
                   ),
                   h("button", {
+                    type: "button",
                     className: "jb-expand-btn",
+                    "aria-expanded": expanded === job.id,
                     onClick: () => setExpanded(expanded === job.id ? null : job.id),
                   }, expanded === job.id ? "Show less ▲" : "View details ▼")
                 )
               ),
- 
-              // Expanded Details
               expanded === job.id && h("div", { className: "jb-card-body" },
                 h("div", { className: "jb-detail-grid" },
                   job.description && h("div", { className: "jb-detail-block" },
@@ -616,13 +613,14 @@ function JobBoardSection({ jobs, loading, onApply, appliedJobIds = [] }) {
                     h("span", { className: "jb-type-badge" }, job.type || "Full-time")
                   ),
                   h("button", {
+                    type: "button",
                     className: `jb-apply-btn ${appliedJobIds.includes(job.id) ? "jb-apply-btn-done" : ""}`,
                     onClick: () => !appliedJobIds.includes(job.id) && onApply(job),
                     disabled: appliedJobIds.includes(job.id),
                   },
                     appliedJobIds.includes(job.id)
                       ? "✓ Applied"
-                      : h("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", width: "16", height: "16" },
+                      : h("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", width: "16", height: "16", "aria-hidden": "true" },
                           h("line", { x1: "22", y1: "2", x2: "11", y2: "13" }),
                           h("polygon", { points: "22 2 15 22 11 13 2 9 22 2" })
                         ),
@@ -638,90 +636,116 @@ function JobBoardSection({ jobs, loading, onApply, appliedJobIds = [] }) {
 
 /* ─── Shortlist Celebration Modal ───────────────────── */
 function ShortlistCelebrationModal({ data, onClose }) {
-  return h("div", {
-    className: "ru-overlay",
-    onClick: onClose,
-    style: { zIndex: 600 }
-  },
-    h("div", {
-      className: "ru-modal",
-      onClick: e => e.stopPropagation(),
-      style: { maxWidth: 500, textAlign: "center" }
-    },
-      h("div", { className: "ru-done-state", style: { padding: "48px 36px", gap: 20 } },
-        // Animated stars
-        h("div", { style: { fontSize: 56, lineHeight: 1 } }, "🎉"),
-        h("div", {
-          style: {
-            width: 80, height: 80,
-            background: "linear-gradient(135deg, rgba(67,233,123,0.2), rgba(67,233,123,0.05))",
-            border: "2px solid rgba(67,233,123,0.5)",
-            borderRadius: "50%",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 36, margin: "0 auto",
-          }
-        }, "⭐"),
+  return h("div", { className: "ru-overlay sc-overlay", role: "dialog", "aria-modal": "true", onClick: onClose },
+    h("div", { className: "ru-modal sc-modal", onClick: e => e.stopPropagation() },
+      h("div", { className: "ru-done-state sc-body" },
+        h("div", { className: "sc-emoji", "aria-hidden": "true" }, "🎉"),
+        h("div", { className: "sc-badge", "aria-hidden": "true" }, "⭐"),
         h("div", null,
-          h("h2", {
-            style: {
-              fontSize: 26, fontWeight: 900, color: "#fff",
-              letterSpacing: "-0.5px", marginBottom: 10,
-              fontFamily: "Inter, sans-serif",
-              background: "linear-gradient(135deg, #43e97b, #38f9d7)",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-              backgroundClip: "text",
-            }
-          }, "You've Been Shortlisted!"),
-          h("p", {
-            style: {
-              fontSize: 16, color: "#a0aec0",
-              fontFamily: "Inter, sans-serif",
-              lineHeight: 1.6, marginBottom: 8,
-            }
-          },
-            "Congratulations! A recruiter has shortlisted you for "
-          ),
-          h("p", {
-            style: {
-              fontSize: 18, fontWeight: 700, color: "#fff",
-              fontFamily: "Inter, sans-serif", marginBottom: 16,
-            }
-          }, `"${data.jobTitle}"`),
-          h("p", {
-            style: {
-              fontSize: 14, color: "#718096",
-              fontFamily: "Inter, sans-serif", lineHeight: 1.6,
-            }
-          },
+          h("h2", { className: "sc-title" }, "You've Been Shortlisted!"),
+          h("p", { className: "sc-lead" }, "Congratulations! A recruiter has shortlisted you for"),
+          h("p", { className: "sc-job" }, `"${data.jobTitle}"`),
+          h("p", { className: "sc-note" },
             "Check your Interview Invites for a message from the recruiter. They may be reaching out to schedule your next steps."
           )
         ),
-        h("div", {
-          style: {
-            background: "rgba(67,233,123,0.06)",
-            border: "1px solid rgba(67,233,123,0.2)",
-            borderRadius: 12, padding: "14px 20px",
-            width: "100%",
-          }
-        },
-          h("div", {
-            style: { fontSize: 12, color: "#43e97b", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: 4, fontFamily: "Inter, sans-serif" }
-          }, "What's next?"),
-          h("div", {
-            style: { fontSize: 14, color: "#a0aec0", fontFamily: "Inter, sans-serif" }
-          }, "Watch for a message in your Invites tab. The recruiter will contact you to discuss next steps.")
+        h("div", { className: "sc-next" },
+          h("div", { className: "sc-next-label" }, "What's next?"),
+          h("div", { className: "sc-next-body" }, "Watch for a message in your Invites tab. The recruiter will contact you to discuss next steps.")
         ),
         h("button", {
-          className: "module-cta",
-          style: {
-            background: "linear-gradient(135deg, #43e97b, #38f9d7)",
-            boxShadow: "0 10px 30px rgba(67,233,123,0.3)",
-            width: "100%", marginTop: 4,
-          },
+          type: "button",
+          className: "module-cta sc-cta",
           onClick: onClose,
         }, "🎊 Amazing! Close")
       )
+    )
+  );
+}
+
+/* ─── Circular Sliding Module Carousel ─────────── */
+function ModuleCarousel({ modules, resumeRecord, onAction }) {
+  const [index, setIndex] = useState(0);
+  const total = modules.length;
+
+  const go = (dir) => {
+    setIndex(prev => (prev + dir + total) % total);
+  };
+
+  const getOffsetClass = (i) => {
+    const diff = (i - index + total) % total;
+    if (diff === 0) return "mc-center";
+    if (diff === 1) return "mc-right-1";
+    if (diff === total - 1) return "mc-left-1";
+    if (diff === 2) return "mc-right-2";
+    if (diff === total - 2) return "mc-left-2";
+    return "mc-hidden";
+  };
+
+  return h("div", { className: "mc-wrap" },
+    h("div", { className: "mc-track" },
+      modules.map((mod, i) => {
+        const offsetClass = getOffsetClass(i);
+        const isCenter = offsetClass === "mc-center";
+        return h("div", {
+          key: mod.id,
+          className: `mc-card ${offsetClass}`,
+          style: { "--accent": mod.accent, "--accent-2": mod.accentSecondary },
+          "aria-hidden": !isCenter,
+          onMouseEnter: () => { if (!isCenter) setIndex(i); }
+        },
+          h("div", { className: "module-card-glow", "aria-hidden": "true" }),
+          h("div", { className: "module-card-top" },
+            h("div", { className: "module-icon-wrap", style: { background: `linear-gradient(135deg, ${mod.accent}, ${mod.accentSecondary})`, boxShadow: `0 10px 30px ${mod.accent}40` } }, mod.icon),
+            h("div", { className: "module-meta" },
+              h("span", { className: "module-tag" }, mod.tag),
+              mod.badge && h("span", { className: `module-badge ${mod.isRecruiterProfile && resumeRecord ? "module-badge-success" : ""}` }, mod.badge)
+            )
+          ),
+          h("h2", { className: "module-title" }, mod.title),
+          h("p", { className: "module-subtitle" }, mod.subtitle),
+          h("div", { className: "module-divider" }),
+          h("p", { className: "module-description" }, mod.description),
+          h("ul", { className: "module-highlights" },
+            mod.highlights.map((highlight, hi) =>
+              h("li", { key: hi, className: "module-highlight-item" },
+                h("svg", { fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", className: "check-icon", "aria-hidden": "true" },
+                  h("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2.5, d: "M5 13l4 4L19 7" })
+                ),
+                highlight
+              )
+            )
+          ),
+          h("button", {
+            type: "button",
+            className: "module-cta",
+            style: { background: `linear-gradient(135deg, ${mod.accent}, ${mod.accentSecondary})`, boxShadow: `0 10px 30px ${mod.accent}40` },
+            onClick: (e) => { e.stopPropagation(); onAction(mod); }
+          },
+            mod.cta,
+            h("svg", { fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", width: "18", height: "18", "aria-hidden": "true" },
+              h("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M13 7l5 5m0 0l-5 5m5-5H6" })
+            )
+          )
+        );
+      })
+    ),
+    h("div", { className: "mc-nav" },
+      h("button", { type: "button", className: "mc-arrow", "aria-label": "Previous module", onClick: () => go(-1) }, "‹"),
+      h("div", { className: "mc-dots", role: "tablist", "aria-label": "Modules" },
+        modules.map((mod, i) =>
+          h("button", {
+            type: "button",
+            key: mod.id,
+            className: `mc-dot ${i === index ? "mc-dot-active" : ""}`,
+            role: "tab",
+            "aria-selected": i === index,
+            onClick: () => setIndex(i),
+            "aria-label": `Go to ${mod.title}`
+          })
+        )
+      ),
+      h("button", { type: "button", className: "mc-arrow", "aria-label": "Next module", onClick: () => go(1) }, "›")
     )
   );
 }
@@ -733,31 +757,37 @@ export default function Dashboard() {
   const [showResumeModal, setShowResumeModal] = useState(false);
   const [resumeRecord, setResumeRecord] = useState(null);
 
-  // NEW: invites & chat state
+  // Tabs: dashboard | jobs | history | settings
+  const [activeTab, setActiveTab] = useState("dashboard");
+
+  // invites & chat state
   const [invites, setInvites] = useState([]);
   const [invitesLoading, setInvitesLoading] = useState(false);
   const [activeChat, setActiveChat] = useState(null);
-  const [showInvitesPanel, setShowInvitesPanel] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
 
   // Job Board
   const [jobs, setJobs] = useState([]);
   const [jobsLoading, setJobsLoading] = useState(false);
-  const [showJobBoard, setShowJobBoard] = useState(false);
   const [applyToast, setApplyToast] = useState(null);
   const [appliedJobIds, setAppliedJobIds] = useState([]);
   const [shortlistCelebration, setShortlistCelebration] = useState(null);
 
+  // guard so the poller/realtime handler doesn't fire twice for the same row
+  const celebrationHandledRef = useRef(new Set());
+
   useEffect(() => {
+    let active = true;
     supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) {
-        setUser(user);
-        fetchMyResume(user.id);
-        fetchMyInvites(user.id);
-        fetchJobs();
-        fetchMyApplications(user.id);
-      }
+      if (!active || !user) return;
+      setUser(user);
+      fetchMyResume(user.id);
+      fetchMyInvites(user.id);
+      fetchJobs();
+      fetchMyApplications(user.id);
+      checkPendingCelebration(user.id);
     });
+    return () => { active = false; };
   }, []);
 
   const fetchMyResume = async (uid) => {
@@ -799,7 +829,58 @@ export default function Dashboard() {
     if (data) setAppliedJobIds(data.map(a => a.job_post_id));
   };
 
-  // Real-time: new invites for this candidate
+  /* ────────────────────────────────────────────────────────────
+     SHOW-ONCE SHORTLIST CELEBRATION
+     Persisted on the `applications` row (`celebration_seen`) so
+     it survives logout/device changes; localStorage is only a
+     same-browser fallback if that column doesn't exist yet.
+
+         alter table applications add column if not exists
+           celebration_seen boolean default false;
+  ──────────────────────────────────────────────────────────── */
+  const localSeenKey = (appId) => `pm_shortlist_seen_${appId}`;
+
+  const markCelebrationSeen = async (application) => {
+    try { localStorage.setItem(localSeenKey(application.id), "true"); } catch (_) { /* ignore */ }
+    try {
+      await supabase.from("applications")
+        .update({ celebration_seen: true })
+        .eq("id", application.id);
+    } catch (_) { /* column may not exist yet — localStorage covers us */ }
+  };
+
+  const hasSeenCelebration = (application) => {
+    if (application.celebration_seen) return true;
+    try { if (localStorage.getItem(localSeenKey(application.id)) === "true") return true; } catch (_) { /* ignore */ }
+    return false;
+  };
+
+  const maybeShowCelebration = (application, jobTitle) => {
+    if (hasSeenCelebration(application)) return;
+    if (celebrationHandledRef.current.has(application.id)) return;
+    celebrationHandledRef.current.add(application.id);
+    setShortlistCelebration({
+      applicationId: application.id,
+      jobTitle: jobTitle || "a position",
+      jobPostId: application.job_post_id,
+    });
+  };
+
+  // On login: check if there's ANY shortlisted application not yet acknowledged
+  const checkPendingCelebration = async (uid) => {
+    const { data } = await supabase
+      .from("applications")
+      .select("*, job_posts(title)")
+      .eq("candidate_id", uid)
+      .eq("status", "shortlisted");
+    if (!data || data.length === 0) return;
+    const unseen = data.find(app => !hasSeenCelebration(app));
+    if (unseen) {
+      maybeShowCelebration(unseen, unseen.job_posts?.title);
+    }
+  };
+
+  // Real-time invites for this candidate
   useEffect(() => {
     if (!user) return;
     const channel = supabase
@@ -817,33 +898,24 @@ export default function Dashboard() {
     return () => supabase.removeChannel(channel);
   }, [user]);
 
-  // Real-time: watch for shortlist via new invite INSERT (more reliable)
+  // Real-time watch for a NEW shortlist while the user is active in-session.
+  // A short poll is kept as a safety net in case the realtime event is
+  // missed (e.g. brief network drop); both paths are deduped through
+  // hasSeenCelebration / celebrationHandledRef so nothing repeats.
   useEffect(() => {
     if (!user) return;
 
-    // Poll every 8 seconds as fallback for realtime
     const pollInterval = setInterval(async () => {
       const { data } = await supabase
         .from("applications")
         .select("*, job_posts(title)")
         .eq("candidate_id", user.id)
         .eq("status", "shortlisted");
-      
-      if (data && data.length > 0) {
-        const latest = data[data.length - 1];
-        // Only show if we haven't shown it already (track in sessionStorage)
-        const shownKey = `shortlist_shown_${latest.id}`;
-        if (!sessionStorage.getItem(shownKey)) {
-          sessionStorage.setItem(shownKey, "true");
-          setShortlistCelebration({
-            jobTitle: latest.job_posts?.title || "a position",
-            jobPostId: latest.job_post_id,
-          });
-        }
-      }
-    }, 8000);
+      if (!data) return;
+      const unseen = data.find(app => !hasSeenCelebration(app));
+      if (unseen) maybeShowCelebration(unseen, unseen.job_posts?.title);
+    }, 30000); // 30s safety-net poll — realtime handles the fast path
 
-    // Also keep realtime as primary (no filter — more reliable)
     const channel = supabase
       .channel(`applications-watch:${user.id}`)
       .on("postgres_changes", {
@@ -851,25 +923,16 @@ export default function Dashboard() {
         schema: "public",
         table: "applications",
       }, (payload) => {
-        if (
-          payload.new.candidate_id === user.id &&
-          payload.new.status === "shortlisted"
-        ) {
-          const shownKey = `shortlist_shown_${payload.new.id}`;
-          if (!sessionStorage.getItem(shownKey)) {
-            sessionStorage.setItem(shownKey, "true");
-            supabase
-              .from("job_posts")
-              .select("title")
-              .eq("id", payload.new.job_post_id)
-              .maybeSingle()
-              .then(({ data: job }) => {
-                setShortlistCelebration({
-                  jobTitle: job?.title || "a position",
-                  jobPostId: payload.new.job_post_id,
-                });
-              });
-          }
+        if (payload.new.candidate_id === user.id && payload.new.status === "shortlisted") {
+          if (hasSeenCelebration(payload.new)) return;
+          supabase
+            .from("job_posts")
+            .select("title")
+            .eq("id", payload.new.job_post_id)
+            .maybeSingle()
+            .then(({ data: job }) => {
+              maybeShowCelebration(payload.new, job?.title);
+            });
         }
       })
       .subscribe();
@@ -880,16 +943,24 @@ export default function Dashboard() {
     };
   }, [user]);
 
+  const handleCloseCelebration = () => {
+    if (shortlistCelebration) {
+      markCelebrationSeen({ id: shortlistCelebration.applicationId });
+    }
+    setShortlistCelebration(null);
+  };
+
   const handleDeclineInvite = async (inviteId) => {
-    await supabase.from("interview_invites")
+    const prev = invites;
+    setInvites(cur => cur.map(i => i.id === inviteId ? { ...i, status: "declined" } : i));
+    const { error } = await supabase.from("interview_invites")
       .update({ status: "declined" })
       .eq("id", inviteId);
-    setInvites(prev => prev.map(i => i.id === inviteId ? { ...i, status: "declined" } : i));
+    if (error) setInvites(prev); // roll back optimistic update on failure
   };
 
   const handleOpenChat = (invite) => {
     setActiveChat(invite);
-    // Mark unread cleared
     if (invite.status === "pending") {
       setUnreadCount(c => Math.max(0, c - 1));
     }
@@ -919,11 +990,11 @@ export default function Dashboard() {
     });
 
     if (error) {
-      if (error.code === "23505") {
-        setApplyToast(`You've already applied for "${job.title}".`);
-      } else {
-        setApplyToast(`Something went wrong. Please try again.`);
-      }
+      setApplyToast(
+        error.code === "23505"
+          ? `You've already applied for "${job.title}".`
+          : "Something went wrong. Please try again."
+      );
     } else {
       setAppliedJobIds(prev => [...prev, job.id]);
       setApplyToast(`Interest sent for "${job.title}"! The recruiter will be notified.`);
@@ -1030,36 +1101,19 @@ export default function Dashboard() {
       badge: resumeRecord ? "✓ Uploaded" : "Get Hired",
       isRecruiterProfile: true,
     },
-    {
-      id: "job-board",
-      tag: "Module 05",
-      title: "Job Board",
-      subtitle: "Browse. Apply. Get Hired.",
-      description:
-        "Browse all open positions posted by recruiters actively hiring on PrepMate. Filter by type, search by skill, and express interest directly — your profile is already on file.",
-      highlights: [
-        "Live recruiter postings",
-        "Filter by role & type",
-        "One-click express interest",
-        "Deadline reminders",
-      ],
-      cta: "Browse Jobs",
-      path: null,
-      accent: "#4facfe",
-      accentSecondary: "#00f2fe",
-      icon: h("svg", { fill: "none", viewBox: "0 0 24 24", stroke: "currentColor" },
-        h("rect", { x: "2", y: "7", width: "20", height: "14", rx: "2", strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 1.5 }),
-        h("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 1.5, d: "M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2" })
-      ),
-      badge: jobs.length > 0 ? `${jobs.length} Live` : "New",
-      isJobBoard: true,
-    },
   ];
 
+  const handleModuleAction = (mod) => {
+    if (mod.isRecruiterProfile) { setShowResumeModal(true); }
+    else if (mod.path) navigate(mod.path);
+  };
+
+  const liveJobsCount = jobs.filter(j => j.active !== false).length;
+
   return h("div", { className: "dashboard-container" },
-    h("div", { className: "orb orb-1" }),
-    h("div", { className: "orb orb-2" }),
-    h("div", { className: "orb orb-3" }),
+    h("div", { className: "orb orb-1", "aria-hidden": "true" }),
+    h("div", { className: "orb orb-2", "aria-hidden": "true" }),
+    h("div", { className: "orb orb-3", "aria-hidden": "true" }),
 
     // Header
     h("header", { className: "dashboard-header" },
@@ -1074,31 +1128,42 @@ export default function Dashboard() {
           h("span", { className: "dashboard-brand-ai" }, "AI")
         )
       ),
-      h("nav", { className: "dashboard-nav" },
-        h("span", { className: "dashboard-nav-item active" }, "Dashboard"),
-        h("span", { className: "dashboard-nav-item" }, "History"),
-        h("span", { className: "dashboard-nav-item" }, "Settings")
+      h("nav", { className: "dashboard-nav", "aria-label": "Primary" },
+        h("button", {
+          type: "button",
+          className: `dashboard-nav-item ${activeTab === "dashboard" ? "active" : ""}`,
+          "aria-current": activeTab === "dashboard" ? "page" : undefined,
+          onClick: () => setActiveTab("dashboard")
+        }, "Dashboard"),
+        h("button", {
+          type: "button",
+          className: `dashboard-nav-item dashboard-nav-item-jobs ${activeTab === "jobs" ? "active" : ""}`,
+          "aria-current": activeTab === "jobs" ? "page" : undefined,
+          onClick: () => setActiveTab("jobs")
+        },
+          "Jobs",
+          (unreadCount > 0 || liveJobsCount > 0) && h("span", { className: "nav-jobs-badge" }, unreadCount > 0 ? unreadCount : liveJobsCount)
+        ),
+        h("button", {
+          type: "button",
+          className: `dashboard-nav-item ${activeTab === "history" ? "active" : ""}`,
+          "aria-current": activeTab === "history" ? "page" : undefined,
+          onClick: () => setActiveTab("history")
+        }, "History"),
+        h("button", {
+          type: "button",
+          className: `dashboard-nav-item ${activeTab === "settings" ? "active" : ""}`,
+          "aria-current": activeTab === "settings" ? "page" : undefined,
+          onClick: () => setActiveTab("settings")
+        }, "Settings")
       ),
       h("div", { className: "dashboard-header-actions" },
-        // Resume status pill
-        resumeRecord && h("div", { className: "dashboard-resume-pill", onClick: () => setShowResumeModal(true) },
-          h("span", { className: "dashboard-resume-dot" }),
+        resumeRecord && h("button", { type: "button", className: "dashboard-resume-pill", onClick: () => setShowResumeModal(true) },
+          h("span", { className: "dashboard-resume-dot", "aria-hidden": "true" }),
           "Profile Live"
         ),
-        // NEW: Invites bell
-        h("button", {
-          className: "invites-bell-btn",
-          onClick: () => setShowInvitesPanel(p => !p),
-          title: "Interview Invites"
-        },
-          h("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", width: "20", height: "20" },
-            h("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" }),
-            h("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M13.73 21a2 2 0 01-3.46 0" })
-          ),
-          unreadCount > 0 && h("span", { className: "invites-bell-badge" }, unreadCount)
-        ),
-        h("button", { className: "logout-btn", onClick: handleLogout },
-          h("svg", { fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", width: "16", height: "16" },
+        h("button", { type: "button", className: "logout-btn", onClick: handleLogout },
+          h("svg", { fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", width: "16", height: "16", "aria-hidden": "true" },
             h("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" })
           ),
           "Logout"
@@ -1106,277 +1171,151 @@ export default function Dashboard() {
       )
     ),
 
-    // NEW: Invites Sidebar Panel
-    showInvitesPanel && h("div", {
-      className: "invites-panel-overlay",
-      onClick: () => setShowInvitesPanel(false)
-    }),
-    h("aside", { className: `invites-panel ${showInvitesPanel ? "invites-panel-open" : ""}` },
-      h("div", { className: "invites-panel-header" },
-        h("div", null,
-          h("h3", { className: "invites-panel-title" }, "Interview Invites"),
-          h("p", { className: "invites-panel-sub" }, `${invites.length} total · ${unreadCount} new`)
-        ),
-        h("button", { className: "ru-close-btn", onClick: () => setShowInvitesPanel(false) }, "✕")
-      ),
-      h(InvitesPanel, {
-        invites,
-        loading: invitesLoading,
-        onOpenChat: (invite) => {
-          handleOpenChat(invite);
-          setShowInvitesPanel(false);
-        },
-        onDecline: handleDeclineInvite,
-      })
-    ),
-
     h("main", { className: "dashboard-main" },
 
-      // Hero
-      h("section", { className: "dashboard-hero" },
-        h("div", { className: "hero-eyebrow" },
-          h("span", { className: "hero-dot" }),
-          "Your Interview Preparation Hub"
-        ),
-        h("h1", { className: "hero-title" },
-          "Land Your ",
-          h("span", { className: "hero-gradient" }, "Dream Job"),
-          h("br"),
-          "with AI Precision"
-        ),
-        h("p", { className: "hero-subtitle" },
-          "Four powerful modules designed to take you from applicant to offer letter. Practice interviews, perfect your resume, close skill gaps, and get discovered by recruiters."
-        ),
-        h("div", { className: "hero-stats" },
-          h("div", { className: "hero-stat" },
-            h("span", { className: "hero-stat-value" }, "24"),
-            h("span", { className: "hero-stat-label" }, "Interviews Done")
+      /* ── DASHBOARD TAB ─────────────────────────────── */
+      activeTab === "dashboard" && h("div", { className: "tab-panel" },
+        h("section", { className: "dashboard-hero" },
+          h("div", { className: "hero-eyebrow" },
+            h("span", { className: "hero-dot", "aria-hidden": "true" }),
+            "Your Interview Preparation Hub"
           ),
-          h("div", { className: "hero-stat-divider" }),
-          h("div", { className: "hero-stat" },
-            h("span", { className: "hero-stat-value" }, "85%"),
-            h("span", { className: "hero-stat-label" }, "Avg Score")
+          h("h1", { className: "hero-title" },
+            "Land Your ",
+            h("span", { className: "hero-gradient" }, "Dream Job"),
+            h("br"),
+            "with AI Precision"
           ),
-          h("div", { className: "hero-stat-divider" }),
-          h("div", { className: "hero-stat" },
-            h("span", { className: "hero-stat-value" }, invites.length || "0"),
-            h("span", { className: "hero-stat-label" }, "Invites Received")
-          )
-        )
-      ),
-
-      // NEW: Invites quick strip (if any)
-      invites.length > 0 && h("section", { className: "invites-strip-section" },
-        h("div", { className: "invites-strip-header" },
-          h("div", { className: "invites-strip-title" },
-            h("span", { className: "invites-strip-icon" }, "🔔"),
-            "Recruiter Invites",
-            unreadCount > 0 && h("span", { className: "invites-strip-new" }, `${unreadCount} new`)
+          h("p", { className: "hero-subtitle" },
+            "Swipe through your modules — practice interviews, perfect your resume, close skill gaps, and get discovered by recruiters."
           ),
-          h("button", {
-            className: "invites-strip-view-all",
-            onClick: () => setShowInvitesPanel(true)
-          }, "View All →")
-        ),
-        h("div", { className: "invites-strip-list" },
-          invites.slice(0, 3).map(invite =>
-            h("div", {
-              key: invite.id,
-              className: `invites-strip-card ${invite.status === "pending" ? "invites-strip-card-new" : ""}`,
-              onClick: () => handleOpenChat(invite)
-            },
-              h("div", { className: "invites-strip-card-left" },
-                h("div", { className: "invites-strip-av" },
-                  (invite.recruiter_email?.split("@")[1]?.charAt(0) || "R").toUpperCase()
-                ),
-                h("div", null,
-                  h("div", { className: "invites-strip-company" },
-                    (() => {
-                      const d = invite.recruiter_email?.split("@")[1]?.split(".")[0] || "Company";
-                      return d.charAt(0).toUpperCase() + d.slice(1);
-                    })()
-                  ),
-                  h("div", { className: "invites-strip-job" }, invite.job_posts?.title || "Interview Opportunity"),
-                  h("div", { className: "invites-strip-date" },
-                    new Date(invite.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })
-                  )
-                )
-              ),
-              h("div", { className: "invites-strip-card-right" },
-                h("span", { className: `invites-strip-status invites-strip-status-${invite.status}` },
-                  invite.status === "pending" ? "New" : invite.status === "accepted" ? "Replied" : "Declined"
-                ),
-                h("button", { className: "invites-strip-reply" }, "💬 Reply")
-              ),
-              invite.status === "pending" && h("div", { className: "invites-strip-dot" })
+          h("div", { className: "hero-stats" },
+            h("div", { className: "hero-stat" },
+              h("span", { className: "hero-stat-value" }, "24"),
+              h("span", { className: "hero-stat-label" }, "Interviews Done")
+            ),
+            h("div", { className: "hero-stat-divider" }),
+            h("div", { className: "hero-stat" },
+              h("span", { className: "hero-stat-value" }, "85%"),
+              h("span", { className: "hero-stat-label" }, "Avg Score")
+            ),
+            h("div", { className: "hero-stat-divider" }),
+            h("div", { className: "hero-stat" },
+              h("span", { className: "hero-stat-value" }, invites.length || "0"),
+              h("span", { className: "hero-stat-label" }, "Invites Received")
             )
           )
+        ),
+
+        h("section", { className: "modules-section" },
+          h("div", { className: "modules-label" }, "Choose Your Module"),
+          h(ModuleCarousel, { modules, resumeRecord, onAction: handleModuleAction })
         )
       ),
 
-      // Job Board Quick Strip
-      jobs.filter(j => j.active !== false).length > 0 &&
-        h("section", { className: "jb-strip-section" },
+      /* ── JOBS TAB (invites + job board live here now) ─ */
+      activeTab === "jobs" && h("div", { className: "tab-panel" },
+        h("section", { className: "jobs-tab-header" },
+          h("h1", { className: "jobs-tab-title" }, "Jobs & Invites"),
+          h("p", { className: "jobs-tab-sub" }, "Everything recruiters have sent you, and every open role on PrepMate.")
+        ),
+
+        h("section", { className: "invites-strip-section" },
           h("div", { className: "invites-strip-header" },
             h("div", { className: "invites-strip-title" },
-              h("span", { className: "invites-strip-icon" }, "💼"),
-              "Open Jobs",
-              h("span", { className: "invites-strip-new" },
-                `${jobs.filter(j => j.active !== false).length} live`
-              )
-            ),
-            h("button", {
-              className: "invites-strip-view-all",
-              onClick: () => setShowJobBoard(true),
-            }, "Browse All →")
-          ),
-          h("div", { className: "jb-strip-grid" },
-            jobs.filter(j => j.active !== false).slice(0, 3).map(job =>
-              h("div", {
-                key: job.id,
-                className: "jb-strip-card",
-                onClick: () => setShowJobBoard(true),
-              },
-                h("div", { className: "jb-strip-av" },
-                  (job.title || "J").charAt(0).toUpperCase()
-                ),
-                h("div", { className: "jb-strip-info" },
-                  h("div", { className: "jb-strip-title" }, job.title),
-                  h("div", { className: "jb-strip-meta" },
-                    (job.location || "Remote") + " · " + (job.type || "Full-time") + (job.salary ? ` · ${job.salary}` : "")
-                  ),
-                  h("div", { className: "jb-strip-tags" },
-                    (job.tags || []).slice(0, 3).map((t, i) =>
-                      h("span", { key: i, className: "jb-tag" }, t)
-                    )
-                  )
-                ),
-                h("button", { className: "invites-strip-reply" }, "View →")
-              )
+              h("span", { className: "invites-strip-icon", "aria-hidden": "true" }, "🔔"),
+              "Recruiter Invites",
+              unreadCount > 0 && h("span", { className: "invites-strip-new" }, `${unreadCount} new`)
             )
-          )
+          ),
+          h(InvitesPanel, {
+            invites,
+            loading: invitesLoading,
+            onOpenChat: handleOpenChat,
+            onDecline: handleDeclineInvite,
+          })
         ),
 
-      // Module Cards
-      h("section", { className: "modules-section" },
-        h("div", { className: "modules-label" }, "Choose Your Module"),
-        h("div", { className: "modules-grid modules-grid-4" },
-          modules.map((mod, index) =>
-            h("div", {
-              key: mod.id,
-              className: `module-card ${mod.isRecruiterProfile && resumeRecord ? "module-card-active" : ""}`,
-              style: { "--accent": mod.accent, "--accent-2": mod.accentSecondary, "--delay": `${index * 0.12}s` }
-            },
-              h("div", { className: "module-card-glow" }),
-              h("div", { className: "module-card-top" },
-                h("div", { className: "module-icon-wrap", style: { background: `linear-gradient(135deg, ${mod.accent}, ${mod.accentSecondary})`, boxShadow: `0 10px 30px ${mod.accent}40` } }, mod.icon),
-                h("div", { className: "module-meta" },
-                  h("span", { className: "module-tag" }, mod.tag),
-                  mod.badge && h("span", { className: `module-badge ${mod.isRecruiterProfile && resumeRecord ? "module-badge-success" : ""}` }, mod.badge)
-                )
-              ),
-              h("h2", { className: "module-title" }, mod.title),
-              h("p", { className: "module-subtitle" }, mod.subtitle),
-              h("div", { className: "module-divider" }),
-              h("p", { className: "module-description" }, mod.description),
-              h("ul", { className: "module-highlights" },
-                mod.highlights.map((highlight, i) =>
-                  h("li", { key: i, className: "module-highlight-item" },
-                    h("svg", { fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", className: "check-icon" },
-                      h("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2.5, d: "M5 13l4 4L19 7" })
-                    ),
-                    highlight
-                  )
-                )
-              ),
-              h("button", {
-                className: "module-cta",
-                style: { background: `linear-gradient(135deg, ${mod.accent}, ${mod.accentSecondary})`, boxShadow: `0 10px 30px ${mod.accent}40` },
-                onClick: () => {
-                  if (mod.isRecruiterProfile) { setShowResumeModal(true); }
-                  else if (mod.isJobBoard) { setShowJobBoard(true); }
-                  else if (mod.path) navigate(mod.path);
-                }
-              },
-                mod.cta,
-                h("svg", { fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", width: "18", height: "18" },
-                  h("path", { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: 2, d: "M13 7l5 5m0 0l-5 5m5-5H6" })
-                )
-              )
+        h("section", { className: "jb-section-inline" },
+          h("div", { className: "invites-strip-header" },
+            h("div", { className: "invites-strip-title" },
+              h("span", { className: "invites-strip-icon", "aria-hidden": "true" }, "💼"),
+              "Open Jobs",
+              h("span", { className: "invites-strip-new" }, `${liveJobsCount} live`)
             )
-          )
+          ),
+          h(JobBoardSection, { jobs, loading: jobsLoading, onApply: handleApply, appliedJobIds })
         )
       ),
 
-      // Recent Activity
-      h("section", { className: "activity-section" },
-        h("div", { className: "activity-header" },
-          h("h3", { className: "activity-title" }, "Recent Activity"),
-          h("a", { href: "#", className: "activity-view-all" }, "View All →")
-        ),
-        h("div", { className: "activity-list" },
-          [
-            ...(resumeRecord ? [{ label: "Resume uploaded — visible to recruiters", time: new Date(resumeRecord.updated_at || resumeRecord.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short" }), color: "#f7971e" }] : []),
-            ...(invites.slice(0, 2).map(inv => ({
-              label: `Interview invite from ${(inv.recruiter_email?.split("@")[1]?.split(".")[0] || "recruiter")} — ${inv.job_posts?.title || "role"}`,
-              time: new Date(inv.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short" }),
-              color: "#43e97b"
-            }))),
-            { label: "Completed Technical Interview", time: "2 hours ago", color: "#667eea" },
-            { label: "Uploaded Resume for Analysis", time: "Yesterday", color: "#f093fb" },
-          ].slice(0, 4).map((item, i) =>
-            h("div", { className: "activity-item", key: i },
-              h("div", { className: "activity-dot", style: { background: item.color } }),
-              h("div", { className: "activity-content" },
-                h("span", { className: "activity-name" }, item.label),
-                h("span", { className: "activity-time" }, item.time)
+      /* ── HISTORY TAB ──────────────────────────────── */
+      activeTab === "history" && h("div", { className: "tab-panel" },
+        h("section", { className: "activity-section" },
+          h("div", { className: "activity-header" },
+            h("h3", { className: "activity-title" }, "Recent Activity")
+          ),
+          h("div", { className: "activity-list" },
+            [
+              ...(resumeRecord ? [{ key: "resume", label: "Resume uploaded — visible to recruiters", time: new Date(resumeRecord.updated_at || resumeRecord.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short" }), color: "#f7971e" }] : []),
+              ...(invites.map(inv => ({
+                key: `invite-${inv.id}`,
+                label: `Interview invite from ${companyFromEmail(inv.recruiter_email) || "recruiter"} — ${inv.job_posts?.title || "role"}`,
+                time: new Date(inv.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short" }),
+                color: "#43e97b"
+              }))),
+            ].map((item) =>
+              h("div", { className: "activity-item", key: item.key },
+                h("div", { className: "activity-dot", style: { background: item.color }, "aria-hidden": "true" }),
+                h("div", { className: "activity-content" },
+                  h("span", { className: "activity-name" }, item.label),
+                  h("span", { className: "activity-time" }, item.time)
+                )
               )
             )
+          ),
+          !resumeRecord && invites.length === 0 && h("p", { className: "ru-vis-sub" }, "No activity yet — apply to a job or set up your recruiter profile to get started.")
+        )
+      ),
+
+      /* ── SETTINGS TAB ─────────────────────────────── */
+      activeTab === "settings" && h("div", { className: "tab-panel" },
+        h("section", { className: "activity-section" },
+          h("div", { className: "activity-header" },
+            h("h3", { className: "activity-title" }, "Settings")
+          ),
+          h("div", { className: "settings-row" },
+            h("div", null,
+              h("div", { className: "ru-vis-title" }, "Account Email"),
+              h("div", { className: "ru-vis-sub" }, user?.email || "—")
+            )
+          ),
+          h("div", { className: "settings-row" },
+            h("div", null,
+              h("div", { className: "ru-vis-title" }, "Recruiter Profile"),
+              h("div", { className: "ru-vis-sub" }, resumeRecord ? "Live and visible to recruiters" : "Not set up yet")
+            ),
+            h("button", { type: "button", className: "ru-btn-primary", onClick: () => setShowResumeModal(true) }, resumeRecord ? "Update" : "Set up")
           )
         )
       )
     ),
 
-    // Job Board Modal
-    showJobBoard && h("div", { className: "jb-overlay", onClick: () => setShowJobBoard(false) },
-      h("div", { className: "jb-modal", onClick: e => e.stopPropagation() },
-        h("div", { className: "jb-modal-header" },
-          h("div", null,
-            h("h2", { className: "ru-modal-title" }, "Job Board"),
-            h("p", { className: "ru-modal-sub" }, `${jobs.filter(j => j.active !== false).length} open positions from PrepMate recruiters`)
-          ),
-          h("button", { className: "ru-close-btn", onClick: () => setShowJobBoard(false) }, "✕")
-        ),
-        h("div", { className: "jb-modal-body" },
-          h(JobBoardSection, {
-            jobs,
-            loading: jobsLoading,
-            onApply: handleApply,
-            appliedJobIds,
-          })
-        )
-      )
-    ),
-
-    applyToast && h("div", { className: "jb-toast" },
-      h("span", null, "✓ "),
+    applyToast && h("div", { className: "jb-toast", role: "status" },
+      h("span", { "aria-hidden": "true" }, "✓ "),
       applyToast
     ),
 
-    // Resume Upload Modal
     showResumeModal && h(ResumeUploadModal, {
       user,
       onClose: () => setShowResumeModal(false),
       onSuccess: () => user && fetchMyResume(user.id),
     }),
 
-    // Shortlist Celebration
     shortlistCelebration && h(ShortlistCelebrationModal, {
       data: shortlistCelebration,
-      onClose: () => setShortlistCelebration(null),
+      onClose: handleCloseCelebration,
     }),
 
-    // NEW: Chat Modal
     activeChat && h(ChatModal, {
       invite: activeChat,
       user,

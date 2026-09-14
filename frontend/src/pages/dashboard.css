@@ -810,11 +810,6 @@ body {
   }
 }
 
-/* ─────────────────────────────────────────────────────────
-   APPEND THIS TO dashboard.css
-   PrepMate AI · Resume Upload Modal + Module Grid (4-col)
-   ───────────────────────────────────────────────────────── */
-
 /* ─── Header Actions (resume pill + logout) ─────────────── */
 .dashboard-header-actions {
   display: flex;
@@ -1191,8 +1186,6 @@ body {
 @keyframes ruSpin { to { transform: rotate(360deg); } }
 
 /* ─── Recruiter Dashboard CSS additions ─────────────────── */
-/* Append these to RecruiterDashboard.css */
-
 .rd-cand-has-resume {
   display: inline-flex;
   align-items: center;
@@ -1286,14 +1279,6 @@ body {
     display: none;
   }
 }
-
-/* ─────────────────────────────────────────────────────────
-   APPEND TO dashboard.css  (candidate side)
-   + ALSO APPEND TO RecruiterDashboard.css  (recruiter side)
-   
-   Both files share the same chat modal CSS since the
-   .chat-* classes are identical on both sides.
-   ───────────────────────────────────────────────────────── */
 
 /* ─── Invites Bell Button (candidate header) ─────────── */
 .invites-bell-btn {
@@ -1941,10 +1926,6 @@ body {
   .invites-strip-job { max-width: 130px; }
 }
 
-/* ─────────────────────────────────────────────────────────────────────────────
-   JOB BOARD CSS — Append this entire block to the bottom of dashboard.css
-   ───────────────────────────────────────────────────────────────────────────── */
-
 /* ─── Job Board Overlay & Modal ─────────────────────────────────────────────── */
 .jb-overlay {
   position: fixed;
@@ -2491,4 +2472,387 @@ body {
   box-shadow: none !important;
   color: #86efac !important;
   cursor: default;
+}
+
+/* ─── Single scrollbar fix ───────────────────────────────────────────────
+   Previously both the window and inner containers could scroll
+   independently. We make .dashboard-container the ONE scrolling
+   surface for the page. */
+html, body {
+  height: 100%;
+  overflow: hidden;
+}
+#root {
+  height: 100%;
+}
+.dashboard-container {
+  height: 100vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-gutter: stable;
+}
+
+/* ─── Tab panels ─────────────────────────────────────────────────────── */
+.tab-panel {
+  animation: slideUp 0.35s ease-out both;
+}
+
+/* ─── Nav "Jobs" badge ───────────────────────────────────────────────── */
+.dashboard-nav-item {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.nav-jobs-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  font-size: 10px;
+  font-weight: 800;
+  color: #fff;
+  background: linear-gradient(135deg, #f093fb, #f5576c);
+  border-radius: 20px;
+}
+
+/* ─── Jobs tab header ────────────────────────────────────────────────── */
+.jobs-tab-header {
+  margin-bottom: 32px;
+}
+.jobs-tab-title {
+  font-size: 34px;
+  font-weight: 900;
+  letter-spacing: -1px;
+  color: #fff;
+  margin-bottom: 8px;
+}
+.jobs-tab-sub {
+  font-size: 15px;
+  color: #a0aec0;
+}
+.jb-section-inline {
+  margin-top: 40px;
+}
+
+/* ─── Settings tab rows ──────────────────────────────────────────────── */
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.settings-row:last-child { border-bottom: none; }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   CIRCULAR SLIDING MODULE CAROUSEL
+   ═══════════════════════════════════════════════════════════════════════ */
+.mc-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px 0 40px;
+}
+
+.mc-track {
+  position: relative;
+  width: 100%;
+  max-width: 980px;
+  height: 620px;
+  perspective: 1400px;
+}
+
+.mc-card {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 410px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 38px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  backdrop-filter: blur(10px);
+  overflow: hidden;
+  cursor: pointer;
+  /* NOTE: transition duration is fixed below in the patch layer —
+     the value here is intentionally overridden (was a 3s bug). */
+  transition: transform 3s cubic-bezier(0.22, 1, 0.36, 1),
+              opacity 3s ease,
+              filter 3s ease;
+}
+
+.mc-card.mc-center {
+  transform: translateX(-50%) translateZ(0) scale(1);
+  opacity: 1;
+  z-index: 5;
+  filter: none;
+  border-color: var(--border-hover);
+  box-shadow: 0 30px 70px rgba(0, 0, 0, 0.4);
+  cursor: default;
+}
+
+.mc-card.mc-left-1 {
+  transform: translateX(calc(-50% - 340px)) translateZ(-160px) scale(0.82) rotateY(18deg);
+  opacity: 0.55;
+  z-index: 4;
+  filter: blur(0.5px) brightness(0.7);
+}
+
+.mc-card.mc-right-1 {
+  transform: translateX(calc(-50% + 340px)) translateZ(-160px) scale(0.82) rotateY(-18deg);
+  opacity: 0.55;
+  z-index: 4;
+  filter: blur(0.5px) brightness(0.7);
+}
+
+.mc-card.mc-left-2 {
+  transform: translateX(calc(-50% - 540px)) translateZ(-300px) scale(0.65) rotateY(24deg);
+  opacity: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.mc-card.mc-right-2 {
+  transform: translateX(calc(-50% + 540px)) translateZ(-300px) scale(0.65) rotateY(-24deg);
+  opacity: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.mc-card.mc-hidden {
+  transform: translateX(-50%) scale(0.5);
+  opacity: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+/* module content sizing inside carousel card */
+.mc-card .module-description {
+  font-size: 14px;
+  max-height: 110px;
+  overflow: hidden;
+}
+.mc-card .module-highlights {
+  max-height: 150px;
+  overflow: hidden;
+}
+
+/* Dots */
+.mc-dots {
+  display: flex;
+  gap: 8px;
+}
+.mc-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  border: none;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  padding: 0;
+}
+.mc-dot-active {
+  width: 24px;
+  border-radius: 5px;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+}
+
+/* ─── Responsive carousel ────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .mc-track { height: 660px; }
+  .mc-card { width: 320px; padding: 28px; }
+  .mc-card.mc-left-1 { transform: translateX(calc(-50% - 230px)) translateZ(-160px) scale(0.78) rotateY(18deg); }
+  .mc-card.mc-right-1 { transform: translateX(calc(-50% + 230px)) translateZ(-160px) scale(0.78) rotateY(-18deg); }
+}
+
+@media (max-width: 640px) {
+  .mc-wrap { padding: 10px 0 44px; }
+  .mc-track { height: 660px; max-width: 100%; }
+  .mc-card { width: 86vw; max-width: 360px; }
+  .mc-card.mc-left-1, .mc-card.mc-left-2 { transform: translateX(-150%) scale(0.8); opacity: 0; pointer-events: none; }
+  .mc-card.mc-right-1, .mc-card.mc-right-2 { transform: translateX(50%) scale(0.8); opacity: 0; pointer-events: none; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   PATCH LAYER — fixes bugs + adds classes used by the cleaned-up JS.
+   Loaded last so it overrides the equivalent rules above.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ─── Bug fix: carousel transition was 3s → felt frozen on dot clicks
+   and hover-switching. 0.6s with an eased curve is snappy and smooth. */
+.mc-card {
+  transition: transform 2s cubic-bezier(0.22, 1, 0.36, 1),
+              opacity 2s ease,
+              filter 2s ease;
+}
+
+/* ─── Carousel nav row: dots + prev/next arrows (mc-nav wraps mc-dots,
+   which was previously absolutely positioned on its own). ─────────── */
+.mc-nav {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+.mc-arrow {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #cbd5e0;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+.mc-arrow:hover {
+  background: rgba(102, 126, 234, 0.15);
+  border-color: rgba(102, 126, 234, 0.35);
+  color: #fff;
+}
+
+/* ─── Focus states for elements that are now real, keyboard-operable
+   controls (nav buttons, resume pill, dropzone, toggle, arrows). ──── */
+.mc-arrow:focus-visible,
+.mc-dot:focus-visible,
+.dashboard-nav-item:focus-visible,
+.dashboard-resume-pill:focus-visible,
+.ru-btn-primary:focus-visible,
+.ru-btn-ghost:focus-visible,
+.jb-apply-btn:focus-visible,
+.invite-reply-btn:focus-visible,
+.chat-send-btn:focus-visible,
+.ru-toggle:focus-visible,
+.ru-dropzone:focus-visible {
+  outline: 2px solid #667eea;
+  outline-offset: 2px;
+}
+
+/* ─── Reset native <button> chrome where <span> became <button>
+   (nav items, resume pill) so semantics improve without changing look. */
+.dashboard-nav-item,
+.dashboard-resume-pill {
+  background: none;
+  border: none;
+  font-family: var(--font-body);
+}
+.dashboard-nav-item.active,
+.dashboard-nav-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* ─── Spinner size variants referenced by the cleaned-up JS
+   (previously done ad-hoc with inline style objects). ──────────────── */
+.ru-spinner-sm { width: 18px; height: 18px; border-width: 2px; }
+.ru-spinner-md { width: 28px; height: 28px; }
+.ru-spinner-lg { width: 32px; height: 32px; }
+
+/* ─── Shortlist celebration modal — moved out of inline styles into
+   named classes for consistency with the rest of the app. ─────────── */
+.sc-modal { max-width: 500px; text-align: center; }
+.sc-body { padding: 48px 36px; gap: 20px; }
+.sc-emoji { font-size: 56px; line-height: 1; }
+.sc-badge {
+  width: 80px;
+  height: 80px;
+  background: linear-gradient(135deg, rgba(67, 233, 123, 0.2), rgba(67, 233, 123, 0.05));
+  border: 2px solid rgba(67, 233, 123, 0.5);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36px;
+  margin: 0 auto;
+}
+.sc-title {
+  font-size: 26px;
+  font-weight: 900;
+  color: #fff;
+  letter-spacing: -0.5px;
+  margin-bottom: 10px;
+  font-family: 'Inter', sans-serif;
+  background: linear-gradient(135deg, #43e97b, #38f9d7);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.sc-lead {
+  font-size: 16px;
+  color: #a0aec0;
+  font-family: 'Inter', sans-serif;
+  line-height: 1.6;
+  margin-bottom: 8px;
+}
+.sc-job {
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+  font-family: 'Inter', sans-serif;
+  margin-bottom: 16px;
+}
+.sc-note {
+  font-size: 14px;
+  color: #718096;
+  font-family: 'Inter', sans-serif;
+  line-height: 1.6;
+}
+.sc-next {
+  background: rgba(67, 233, 123, 0.06);
+  border: 1px solid rgba(67, 233, 123, 0.2);
+  border-radius: 12px;
+  padding: 14px 20px;
+  width: 100%;
+}
+.sc-next-label {
+  font-size: 12px;
+  color: #43e97b;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin-bottom: 4px;
+  font-family: 'Inter', sans-serif;
+}
+.sc-next-body {
+  font-size: 14px;
+  color: #a0aec0;
+  font-family: 'Inter', sans-serif;
+}
+.sc-cta {
+  background: linear-gradient(135deg, #43e97b, #38f9d7) !important;
+  box-shadow: 0 10px 30px rgba(67, 233, 123, 0.3) !important;
+  width: 100%;
+  margin-top: 4px;
+}
+
+/* ── Hide scrollbars on .dashboard-container and every inner
+   scrollable panel (invites-panel, invites-list, chat-messages,
+   ru-modal-body, jb-modal-body, etc.) ── */
+.dashboard-container {
+  scrollbar-width: none;      /* Firefox */
+  -ms-overflow-style: none;   /* IE / old Edge */
+}
+* {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+*::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }

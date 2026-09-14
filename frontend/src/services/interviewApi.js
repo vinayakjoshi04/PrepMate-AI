@@ -11,11 +11,25 @@ const API_BASE_URL = `${getAPIUrl()}/api`;
 
 console.log("🌐 API Base URL:", API_BASE_URL);
 
-/**
- * Create a new interview session.
- * Now passes questionsCount, difficulty, focusAreas, and roundName
- * so the backend can tailor questions to the user's step-3 preferences.
- */
+const fetchWithRetry = async (url, options, { retries = 2, backoffMs = 1000 } = {}) => {
+  let lastError;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const response = await fetch(url, options);
+      if (!response.ok && response.status >= 500 && attempt < retries) {
+        await new Promise(r => setTimeout(r, backoffMs * (attempt + 1)));
+        continue;
+      }
+      return response;
+    } catch (err) {
+      lastError = err;
+      if (err.name === 'AbortError' || attempt === retries) throw err;
+      await new Promise(r => setTimeout(r, backoffMs * (attempt + 1)));
+    }
+  }
+  throw lastError;
+};
+
 export const createInterviewSession = async (formData) => {
   try {
     console.log("🚀 createInterviewSession →", `${API_BASE_URL}/create-interview`);
@@ -23,7 +37,7 @@ export const createInterviewSession = async (formData) => {
     const controller = new AbortController();
     const timeoutId  = setTimeout(() => controller.abort(), 90000);
 
-    const response = await fetch(`${API_BASE_URL}/create-interview`, {
+    const response = await fetchWithRetry(`${API_BASE_URL}/create-interview`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -32,7 +46,6 @@ export const createInterviewSession = async (formData) => {
         experienceLevel: formData.experienceLevel,
         interviewType:   formData.interviewType,
         industry:        formData.industry        || "",
-        // Step-3 preferences — previously sent but ignored by backend
         questionsCount:  formData.questionsCount  || 5,
         difficulty:      formData.difficulty      || "mixed",
         focusAreas:      formData.focusAreas      || [],
@@ -74,17 +87,12 @@ export const createInterviewSession = async (formData) => {
   }
 };
 
-
-/**
- * Analyze a single interview answer.
- * Used as a fallback if the batch endpoint is unavailable.
- */
 export const analyzeAnswer = async (answerData, interviewContext) => {
   try {
     const controller = new AbortController();
     const timeoutId  = setTimeout(() => controller.abort(), 60000);
 
-    const response = await fetch(`${API_BASE_URL}/analyze-answer`, {
+    const response = await fetchWithRetry(`${API_BASE_URL}/analyze-answer`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -117,7 +125,6 @@ export const analyzeAnswer = async (answerData, interviewContext) => {
     if (error.name === 'AbortError') {
       throw new Error("Analysis timed out. Please try again.");
     }
-    // Return a safe fallback so Results.js doesn't crash
     const wc = (answerData.answer || '').split(/\s+/).length;
     return {
       score:        Math.min(3 + Math.floor(wc / 20), 8),
@@ -129,34 +136,21 @@ export const analyzeAnswer = async (answerData, interviewContext) => {
   }
 };
 
-
-/**
- * Batch analyze ALL interview answers in a single API call.
- *
- * WHY: Results.js previously called analyzeAnswer() once per question
- * sequentially — 21 calls for a 3-round × 7Q interview. That chains
- * 21 LLM calls and reliably times out on Render's free tier.
- *
- * This sends everything in one request → one LLM call → one response.
- *
- * @param {Array}  answers          - Full answers array from localStorage
- * @param {string} jobTitle
- * @param {string} experienceLevel
- * @returns {Promise<Array>}        - Ordered array of analysis results
- */
-export const batchAnalyzeAnswers = async (answers, jobTitle, experienceLevel) => {
+export const batchAnalyzeAnswers = async (answers, jobTitle, experienceLevel, onProgress) => {
   try {
     console.log(`🔍 Batch analyzing ${answers.length} answers…`);
 
     const controller = new AbortController();
-    // Allow up to 120 s — one big call beats 21 small ones even if it's slower
     const timeoutId  = setTimeout(() => controller.abort(), 120000);
 
-    const response = await fetch(`${API_BASE_URL}/batch-analyze-answers`, {
+    const response = await fetchWithRetry(`${API_BASE_URL}/batch-analyze-answers`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ answers, jobTitle, experienceLevel }),
       signal: controller.signal,
+    }, {
+      retries: 1,
+      backoffMs: 1500,
     });
 
     clearTimeout(timeoutId);
@@ -168,6 +162,7 @@ export const batchAnalyzeAnswers = async (answers, jobTitle, experienceLevel) =>
 
     const data = await response.json();
     console.log(`✅ Batch analysis: ${data.results?.length} results`);
+    onProgress?.('done');
     return data.results || [];
 
   } catch (error) {
@@ -176,9 +171,8 @@ export const batchAnalyzeAnswers = async (answers, jobTitle, experienceLevel) =>
     if (error.name === 'AbortError') {
       console.warn("⏳ Batch timed out — falling back to word-count estimates");
     }
+    onProgress?.('fallback');
 
-    // Client-side fallback: estimate every answer from word count
-    // so Results.js always has something to show
     return answers.map(a => {
       const skipped = (a.answer || '').trim() === '[Skipped]';
       const wc      = skipped ? 0 : (a.answer || '').split(/\s+/).length;
@@ -198,8 +192,41 @@ export const batchAnalyzeAnswers = async (answers, jobTitle, experienceLevel) =>
   }
 };
 
+export const analyzeMultimodal = async (videoBlob, question, answerText, jobTitle, experienceLevel) => {
+  try {
+    const controller = new AbortController();
+    const timeoutId  = setTimeout(() => controller.abort(), 120000);
 
-/** Test backend reachability */
+    const form = new FormData();
+    form.append("question", question || "");
+    form.append("answer", answerText || "");
+    form.append("jobTitle", jobTitle || "");
+    form.append("experienceLevel", experienceLevel || "");
+    if (videoBlob) {
+      form.append("video", videoBlob, "answer.webm");
+    }
+
+    const response = await fetch(`${API_BASE_URL}/analyze-multimodal`, {
+      method: "POST",
+      body: form,
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({ error: "Unknown error" }));
+      throw new Error(err.error || `Server error: ${response.status}`);
+    }
+
+    return await response.json();
+
+  } catch (error) {
+    console.error("❌ Multimodal analysis failed:", error.message);
+    return null;
+  }
+};
+
 export const testBackendConnection = async () => {
   try {
     const controller = new AbortController();
@@ -212,7 +239,6 @@ export const testBackendConnection = async () => {
   }
 };
 
-/** Get backend health details */
 export const getBackendHealth = async () => {
   try {
     const response = await fetch(`${API_BASE_URL}/health`);
@@ -222,4 +248,102 @@ export const getBackendHealth = async () => {
   }
 };
 
+export const cancelInterviewSession = async (sessionId) => {
+  if (!sessionId) return false;
+  try {
+    const response = await fetch(`${API_BASE_URL}/cancel-interview/${sessionId}`, {
+      method: "POST",
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+};
+
+export const exportResultsAsJSON = (results, filename = "interview-results.json") => {
+  const blob = new Blob([JSON.stringify(results, null, 2)], { type: "application/json" });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+};
+
 export { API_BASE_URL };
+
+/**
+ * Analyze an ENTIRE interview in one request — video clips, coding answers,
+ * and skipped questions together.
+ *
+ * @param {Array} items - per-question metadata (questionId, question, answerText, round, skipped, isCoding)
+ * @param {Map}   videoBlobs - map of questionId -> Blob, from mediaStore.all()
+ * @param {string} jobTitle
+ * @param {string} experienceLevel
+ * @param {string} sessionId - client-generated id grouping all clips from this practice session
+ * @param {string|null} userId - logged-in Supabase user id, or null if not logged in
+ *
+ * @returns {Promise<{results: Array|null, executiveSummary: string|null}>}
+ *          results is null on total failure so the caller can show a warning.
+ */
+export const analyzeInterviewBatch = async (
+  items,
+  videoBlobs,
+  jobTitle,
+  experienceLevel,
+  sessionId,
+  userId
+) => {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 240000);
+
+    const form = new FormData();
+    form.append("meta", JSON.stringify(items));
+    form.append("jobTitle", jobTitle || "");
+    form.append("experienceLevel", experienceLevel || "");
+    form.append("sessionId", sessionId || "unknown");
+    form.append("userId", userId || "");
+    items.forEach((it) => {
+      const blob = videoBlobs.get ? videoBlobs.get(String(it.questionId)) : null;
+      if (blob) form.append(`video_${it.questionId}`, blob, `answer_${it.questionId}.webm`);
+    });
+
+    const response = await fetch(`${API_BASE_URL}/analyze-interview-batch`, {
+      method: "POST",
+      body: form,
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({ error: "Unknown error" }));
+      throw new Error(err.error || `Server error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return { results: data.results || [], executiveSummary: data.executiveSummary || null };
+  } catch (error) {
+    console.error("❌ Interview batch analysis failed:", error.message);
+    return { results: null, executiveSummary: null };
+  }
+};
+
+/**
+ * Fetch a fresh signed URL for a previously stored recording, since signed
+ * URLs expire (default 1 hour on the backend).
+ * @param {string} storagePath - the storage_path value from practice_recordings
+ */
+export const getRecordingUrl = async (storagePath) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/get-recording-url?path=${encodeURIComponent(storagePath)}`);
+    if (!response.ok) return null;
+    const data = await response.json();
+    return data.url || null;
+  } catch (error) {
+    console.error("❌ Failed to fetch recording URL:", error.message);
+    return null;
+  }
+};

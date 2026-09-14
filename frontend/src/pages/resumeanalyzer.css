@@ -2037,3 +2037,172 @@
   .ats-view-toggle button { flex: 1; justify-content: center; }
   .ats-resume-card { padding: 24px 16px; }
 }
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+}
+#root {
+  height: 100%;
+}
+.resume-analyzer-container {
+  height: 100vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-gutter: stable;
+}
+
+/* ── Hide scrollbars on .resume-analyzer-container and every inner
+   scrollable panel (ats-preview-text, results-tabs on mobile, etc.) ── */
+.resume-analyzer-container {
+  scrollbar-width: none;      /* Firefox */
+  -ms-overflow-style: none;   /* IE / old Edge */
+}
+* {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+*::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+/* ─── v3 additions: professional polish + new tabs ─────────────────────────── */
+
+/* Slightly more restrained, professional palette accents */
+:root {
+  --surface-card: rgba(255,255,255,0.035);
+}
+
+.analyzer-header h1 {
+  letter-spacing: -0.8px;
+}
+
+/* Verdict banner */
+.verdict-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 18px 24px;
+  background: linear-gradient(135deg, rgba(102,126,234,0.10), rgba(118,75,162,0.10));
+  border: 1px solid var(--border-hover);
+  border-radius: var(--radius-md);
+}
+.verdict-banner svg { color: var(--purple-light); flex-shrink: 0; margin-top: 2px; }
+.verdict-banner p { font-size: 14.5px; color: #dfe3f5; line-height: 1.6; margin: 0; }
+
+/* Red flags banner */
+.red-flags-banner {
+  padding: 20px 24px;
+  background: rgba(245, 87, 108, 0.06);
+  border: 1px solid rgba(245, 87, 108, 0.25);
+  border-radius: var(--radius-md);
+}
+.red-flags-banner h4 {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 15px; font-weight: 700; color: var(--red); margin-bottom: 10px;
+}
+.red-flags-banner ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.red-flags-banner li {
+  font-size: 13.5px; color: #f3c6cc; line-height: 1.6; padding-left: 18px; position: relative;
+}
+.red-flags-banner li::before { content: "⚠"; position: absolute; left: 0; color: var(--red); }
+
+/* Point-list cards (Positives / Negatives) */
+.point-list-card {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 36px;
+  backdrop-filter: blur(10px);
+}
+.point-list-card h3 {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 20px; font-weight: 800; letter-spacing: -0.4px;
+  margin-bottom: 8px;
+}
+.positives-card h3 svg { color: var(--green); }
+.negatives-card h3 svg { color: var(--red); }
+
+.point-list {
+  list-style: none;
+  margin: 20px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.point-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 18px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  line-height: 1.6;
+  color: #d7dbe8;
+  border: 1px solid var(--border);
+  transition: all 0.25s ease;
+}
+.point-item:hover { transform: translateX(3px); }
+.point-item.positive { background: rgba(67, 233, 123, 0.05); border-color: rgba(67, 233, 123, 0.2); }
+.point-item.negative { background: rgba(245, 87, 108, 0.05); border-color: rgba(245, 87, 108, 0.2); }
+.point-icon {
+  flex-shrink: 0;
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+}
+.point-item.positive .point-icon { background: rgba(67, 233, 123, 0.18); color: var(--green); }
+.point-item.negative .point-icon { background: rgba(245, 87, 108, 0.18); color: var(--red); }
+.empty-hint { color: var(--text-muted); font-size: 14px; padding: 20px 0; }
+
+/* Format check card */
+.format-check-card {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 36px;
+  backdrop-filter: blur(10px);
+}
+.format-check-card h3 {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 20px; font-weight: 800; letter-spacing: -0.4px; margin-bottom: 8px;
+}
+.format-checks-list {
+  display: flex; flex-direction: column; gap: 10px; margin-top: 20px;
+}
+.format-check-item {
+  display: flex; align-items: flex-start; gap: 14px;
+  padding: 16px 20px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+}
+.format-check-item.pass { background: rgba(67, 233, 123, 0.05); border-color: rgba(67, 233, 123, 0.2); }
+.format-check-item.fail { background: rgba(245, 87, 108, 0.05); border-color: rgba(245, 87, 108, 0.2); }
+.format-check-icon {
+  flex-shrink: 0;
+  width: 28px; height: 28px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+}
+.format-check-item.pass .format-check-icon { background: rgba(67, 233, 123, 0.18); color: var(--green); }
+.format-check-item.fail .format-check-icon { background: rgba(245, 87, 108, 0.18); color: var(--red); }
+.format-check-item strong { display: block; font-size: 14px; color: var(--text-primary); margin-bottom: 2px; }
+.format-check-item p { font-size: 13px; color: var(--text-muted); margin: 0; }
+
+/* small spinner variant for per-button loading */
+.button-spinner.small {
+  width: 14px; height: 14px; border-width: 2px;
+}
+
+/* Slightly refined export / regenerate buttons disabled state */
+.export-btn:disabled, .btn-regenerate:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+@media (max-width: 768px) {
+  .point-list-card, .format-check-card { padding: 24px; }
+}

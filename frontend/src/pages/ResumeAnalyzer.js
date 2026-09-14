@@ -1,4 +1,4 @@
-// frontend/src/pages/ResumeAnalyzer.js - ENHANCED v2
+// frontend/src/pages/ResumeAnalyzer.js - ENHANCED v3
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import './resumeanalyzer.css';
 
@@ -7,9 +7,11 @@ import './resumeanalyzer.css';
 const TABS = [
   { id: 'overview',      label: 'Overview',      icon: 'home' },
   { id: 'sections',      label: 'Sections',       icon: 'layers' },
+  { id: 'positives',     label: 'Positives',      icon: 'check' },
+  { id: 'negatives',     label: 'Negatives',      icon: 'alert' },
   { id: 'keywords',      label: 'Keywords',       icon: 'search' },
-  { id: 'improvements',  label: 'Improvements',   icon: 'zap' },
-  { id: 'ats-resume',    label: 'ATS Resume',     icon: 'file-text' },
+  { id: 'format',        label: 'Format Check',   icon: 'file-text' },
+  { id: 'ats-resume',    label: 'ATS Resume',     icon: 'sparkle' },
 ];
 
 const SVG_ICONS = {
@@ -79,6 +81,11 @@ const SVG_ICONS = {
       <polyline points="20 6 9 17 4 12" />
     </svg>
   ),
+  x: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+  ),
   user: (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
       <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
@@ -140,125 +147,6 @@ const getScoreLabel = (score) => {
   if (score >= 60) return 'Good';
   if (score >= 50) return 'Fair';
   return 'Needs Improvement';
-};
-
-// ─── ATS Resume Builder ───────────────────────────────────────────────────────
-// Parses raw analysis data and builds a clean ATS-formatted resume string.
-
-const buildATSResumeText = (analysis, parsedSections) => {
-  const sections = parsedSections || {};
-
-  const contactBlock = sections.contact
-    ? sections.contact.trim()
-    : '[Your Name]\n[Phone] | [Email] | [LinkedIn] | [City, State]';
-
-  const summaryBlock = sections.summary
-    ? sections.summary.trim()
-    : (analysis.improvedResume ? extractSection(analysis.improvedResume, 'summary') : '');
-
-  const experienceBlock = sections.experience
-    ? sections.experience.trim()
-    : (analysis.improvedResume ? extractSection(analysis.improvedResume, 'experience') : '');
-
-  const educationBlock = sections.education
-    ? sections.education.trim()
-    : (analysis.improvedResume ? extractSection(analysis.improvedResume, 'education') : '');
-
-  const skillsBlock = buildSkillsBlock(analysis);
-
-  const lines = [];
-
-  lines.push(contactBlock);
-  lines.push('');
-  lines.push('─'.repeat(60));
-
-  if (summaryBlock) {
-    lines.push('');
-    lines.push('PROFESSIONAL SUMMARY');
-    lines.push('─'.repeat(20));
-    lines.push(summaryBlock);
-  }
-
-  if (experienceBlock) {
-    lines.push('');
-    lines.push('WORK EXPERIENCE');
-    lines.push('─'.repeat(20));
-    lines.push(experienceBlock);
-  }
-
-  if (educationBlock) {
-    lines.push('');
-    lines.push('EDUCATION');
-    lines.push('─'.repeat(20));
-    lines.push(educationBlock);
-  }
-
-  if (skillsBlock) {
-    lines.push('');
-    lines.push('SKILLS');
-    lines.push('─'.repeat(20));
-    lines.push(skillsBlock);
-  }
-
-  return lines.join('\n');
-};
-
-// Safely convert any API value to a plain string for text processing.
-const toSafeString = (val) => {
-  if (!val) return '';
-  if (typeof val === 'string') return val;
-  if (Array.isArray(val)) return val.map(toSafeString).join('\n');
-  if (typeof val === 'object') {
-    // Try common key names that backends use for resume text
-    const textKeys = ['text', 'content', 'resume', 'body', 'value', 'data'];
-    for (const k of textKeys) {
-      if (val[k] && typeof val[k] === 'string') return val[k];
-    }
-    // Last resort: JSON stringify so it's at least a string
-    try { return JSON.stringify(val, null, 2); } catch { return ''; }
-  }
-  return String(val);
-};
-
-const extractSection = (raw, sectionName) => {
-  const text = toSafeString(raw);
-  if (!text) return '';
-  const patterns = {
-    contact:    /(?:contact|personal info)[:\s\n]+([\s\S]*?)(?=\n[A-Z]{3,}|\n─|$)/i,
-    summary:    /(?:summary|profile|objective|about)[:\s\n]+([\s\S]*?)(?=\n[A-Z]{3,}|\n─|$)/i,
-    experience: /(?:experience|employment|work history|career)[:\s\n]+([\s\S]*?)(?=\n[A-Z]{3,}|\n─|$)/i,
-    education:  /(?:education|academic|qualifications)[:\s\n]+([\s\S]*?)(?=\n[A-Z]{3,}|\n─|$)/i,
-    skills:     /(?:skills|competencies|technologies|expertise)[:\s\n]+([\s\S]*?)(?=\n[A-Z]{3,}|\n─|$)/i,
-  };
-  if (!patterns[sectionName]) return '';
-  const match = text.match(patterns[sectionName]);
-  return match ? match[1].trim() : '';
-};
-
-const buildSkillsBlock = (analysis) => {
-  const existing = analysis.strengths
-    ? analysis.strengths
-        .filter(s => s.length < 40)
-        .slice(0, 8)
-    : [];
-  const gaps = analysis.keywordGaps ? analysis.keywordGaps.slice(0, 6) : [];
-  const combined = [...new Set([...existing, ...gaps])];
-  return combined.length ? combined.join(' • ') : '';
-};
-
-// ─── Parsed Sections State ────────────────────────────────────────────────────
-// Tries to split improvedResume into editable sections client-side.
-
-const parseSections = (raw) => {
-  const text = toSafeString(raw);
-  if (!text) return {};
-  return {
-    contact:    extractSection(text, 'contact') || text.split('\n').slice(0, 4).join('\n'),
-    summary:    extractSection(text, 'summary'),
-    experience: extractSection(text, 'experience'),
-    education:  extractSection(text, 'education'),
-    skills:     extractSection(text, 'skills'),
-  };
 };
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -341,10 +229,9 @@ const ResumeAnalyzer = () => {
 
   // ATS Resume state
   const [atsResumeText, setAtsResumeText] = useState('');
-  const [editingAts, setEditingAts] = useState(false);
   const [generatingAts, setGeneratingAts] = useState(false);
-  const [parsedSections, setParsedSections] = useState({});
   const [atsPreviewMode, setAtsPreviewMode] = useState('preview'); // 'preview' | 'raw'
+  const [downloadingFmt, setDownloadingFmt] = useState(null);
 
   const atsTextareaRef = useRef(null);
 
@@ -367,16 +254,11 @@ const ResumeAnalyzer = () => {
     return () => clearInterval(timer);
   }, [analysis]);
 
-  // ── Auto-build ATS resume when analysis arrives ───────────────────────────
+  // ── Load the AI-generated ATS resume when analysis arrives ────────────────
 
   useEffect(() => {
     if (!analysis) return;
-    // toSafeString handles string / object / array / null from the API
-    const rawResume = toSafeString(analysis.improvedResume);
-    const sections = parseSections(rawResume);
-    setParsedSections(sections);
-    const built = buildATSResumeText(analysis, sections);
-    setAtsResumeText(built);
+    setAtsResumeText(analysis.improvedResume || '');
   }, [analysis]);
 
   // ── File validation ───────────────────────────────────────────────────────
@@ -455,7 +337,7 @@ const ResumeAnalyzer = () => {
     }
   };
 
-  // ── Generate improved ATS resume via API ──────────────────────────────────
+  // ── Generate / Regenerate ATS resume via API ──────────────────────────────
 
   const handleGenerateAtsResume = async () => {
     if (!analysis) return;
@@ -463,13 +345,12 @@ const ResumeAnalyzer = () => {
     setError('');
 
     try {
-      const response = await fetch(`${API_URL}/api/analyze-resume`, {
+      const response = await fetch(`${API_URL}/api/generate-ats-resume`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
           existingAnalysis: analysis,
-          generateAtsResume: true,
           jobDescription: jobDescription || '',
           keywordsToAdd: Array.from(addedKeywords),
         }),
@@ -477,46 +358,69 @@ const ResumeAnalyzer = () => {
 
       if (!response.ok) throw new Error('Failed to generate ATS resume');
       const data = await response.json();
-
-      if (data.atsResume || data.improvedResume) {
-        const text = data.atsResume || data.improvedResume;
-        setAtsResumeText(text);
-      }
-    } catch {
-      // fallback: rebuild from current data
-      const rebuilt = buildATSResumeText(analysis, parsedSections);
-      setAtsResumeText(rebuilt);
+      if (data.atsResume) setAtsResumeText(data.atsResume);
+    } catch (err) {
+      setError('Could not regenerate the ATS resume. Please try again.');
     } finally {
       setGeneratingAts(false);
     }
   };
 
-  // ── Download ──────────────────────────────────────────────────────────────
+  // ── Download (real docx/pdf built server-side, txt built client-side) ────
 
   const handleDownload = async (format = 'pdf') => {
-    const content = atsResumeText || analysis?.improvedResume || '';
-    if (!content) return;
+    // Guard against ever sending raw JSON/analysis objects as "resume text" —
+    // this is what previously caused JSON to get baked into the .docx file.
+    const content = (typeof atsResumeText === 'string' && atsResumeText.trim())
+      ? atsResumeText
+      : (typeof analysis?.improvedResume === 'string' ? analysis.improvedResume : '');
+
+    if (!content || !content.trim()) {
+      setError('There is no resume text to export yet. Click "Regenerate" on the ATS Resume tab first.');
+      return;
+    }
+    if (content.trim().startsWith('{')) {
+      setError('The ATS resume text looks malformed (JSON instead of plain text). Click "Regenerate" and try again.');
+      return;
+    }
+
+    setDownloadingFmt(format);
+    setError('');
 
     try {
-      if (format === 'pdf') {
-        const response = await fetch(`${API_URL}/api/export-resume`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ content, format: 'pdf' }),
-        });
-        if (!response.ok) throw new Error('PDF generation failed');
-        const blob = await response.blob();
-        triggerDownload(blob, `ats_optimized_${stripExt(fileName)}.pdf`);
-      } else {
-        const mimeTypes = {
-          docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-          txt: 'text/plain',
-        };
-        const blob = new Blob([content], { type: mimeTypes[format] || 'text/plain' });
-        triggerDownload(blob, `ats_optimized_${stripExt(fileName)}.${format}`);
+      if (format === 'txt') {
+        const blob = new Blob([content], { type: 'text/plain' });
+        triggerDownload(blob, `ats_optimized_${stripExt(fileName)}.txt`);
+        return;
       }
+
+      const response = await fetch(`${API_URL}/api/export-resume`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content, format }),
+      });
+
+      // Read the response ONCE as text, then decide how to interpret it.
+      // This prevents a JSON error body from ever being saved as a "file".
+      const contentType = response.headers.get('content-type') || '';
+
+      if (!response.ok || contentType.includes('application/json')) {
+        let message = `${format.toUpperCase()} generation failed`;
+        try {
+          const errJson = await response.json();
+          if (errJson?.error) message = errJson.error;
+        } catch {
+          // response wasn't JSON either — keep the generic message
+        }
+        throw new Error(message);
+      }
+
+      const blob = await response.blob();
+      triggerDownload(blob, `ats_optimized_${stripExt(fileName)}.${format}`);
     } catch (err) {
-      setError('Download failed. Please try again.');
+      setError(err.message || `Download failed (${format.toUpperCase()}). Please try again.`);
+    } finally {
+      setDownloadingFmt(null);
     }
   };
 
@@ -531,7 +435,7 @@ const ResumeAnalyzer = () => {
     URL.revokeObjectURL(url);
   };
 
-  const stripExt = (name) => name.replace(/\.[^/.]+$/, '');
+  const stripExt = (name) => (name || 'resume').replace(/\.[^/.]+$/, '');
 
   // ── Copy to clipboard ─────────────────────────────────────────────────────
 
@@ -569,35 +473,30 @@ const ResumeAnalyzer = () => {
     setDisplayScore(0);
     setAddedKeywords(new Set());
     setAtsResumeText('');
-    setParsedSections({});
-    setEditingAts(false);
   };
 
-  // ── Score breakdown (uses real data if available, estimates otherwise) ─────
+  // ── Score breakdown ────────────────────────────────────────────────────────
 
   const getBreakdown = () => {
     if (!analysis) return [];
-    // Try to pull from section scores
     const sectionScores = {};
     (analysis.sectionFeedback || []).forEach((s) => {
       sectionScores[s.section?.toLowerCase()] = s.score;
     });
 
     const avg = (keys) => {
-      const vals = keys.map((k) => sectionScores[k]).filter(Boolean);
+      const vals = keys.map((k) => sectionScores[k]).filter((v) => v !== undefined && v !== null);
       return vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : null;
     };
 
     const ats = analysis.atsScore || 0;
     return [
-      { label: 'Formatting',      score: avg(['format', 'formatting', 'structure', 'layout']) || Math.min(100, ats + 10) },
-      { label: 'Keywords',        score: avg(['keywords', 'keyword', 'skills']) || Math.max(0, ats - 15) },
-      { label: 'Content Quality', score: avg(['content', 'experience', 'work experience']) || Math.min(100, ats + 5) },
-      { label: 'Structure',       score: avg(['structure', 'sections', 'education']) || ats },
+      { label: 'Formatting',      score: avg(['format', 'formatting', 'structure', 'layout', 'contact information']) ?? Math.min(100, ats + 10) },
+      { label: 'Keywords',        score: avg(['keywords', 'keyword', 'skills']) ?? Math.max(0, ats - 15) },
+      { label: 'Content Quality', score: avg(['content', 'experience', 'work experience', 'professional summary']) ?? Math.min(100, ats + 5) },
+      { label: 'Structure',       score: avg(['structure', 'sections', 'education']) ?? ats },
     ];
   };
-
-  // ── Impact classification ─────────────────────────────────────────────────
 
   const getImpact = (index, total) => {
     if (index < Math.ceil(total * 0.3)) return 'high';
@@ -607,22 +506,25 @@ const ResumeAnalyzer = () => {
 
   const impactIcon = (impact) => {
     if (impact === 'high') return SVG_ICONS.alert;
-    if (impact === 'medium') return SVG_ICONS.info;
     return SVG_ICONS.info;
   };
 
-  // ── Job match score (derived) ─────────────────────────────────────────────
+  // ── Job match score (prefer server-computed, fallback to local estimate) ──
 
   const jobMatchScore = () => {
+    if (analysis?.jobMatchScore !== null && analysis?.jobMatchScore !== undefined) {
+      return analysis.jobMatchScore;
+    }
     if (!jobDescription || !analysis) return null;
     const descWords = new Set(jobDescription.toLowerCase().split(/\W+/).filter(w => w.length > 3));
-    const resumeText = (atsResumeText || toSafeString(analysis.improvedResume)).toLowerCase();
+    const resumeText = (atsResumeText || '').toLowerCase();
     let matched = 0;
     descWords.forEach((w) => { if (resumeText.includes(w)) matched++; });
     return descWords.size ? Math.round((matched / descWords.size) * 100) : null;
   };
 
   const jms = jobMatchScore();
+  const formatChecks = analysis?.formatChecks;
 
   // ─── Render ────────────────────────────────────────────────────────────────
 
@@ -640,7 +542,7 @@ const ResumeAnalyzer = () => {
             <div>
               <h1>Resume Analyzer</h1>
               <p className="header-subtitle">
-                AI-powered ATS analysis · Keyword optimization · Professional resume generation
+                AI-powered ATS analysis · Line-by-line scoring · Keyword optimization · JD-tailored resume export
               </p>
             </div>
             {analysis && (
@@ -707,8 +609,8 @@ const ResumeAnalyzer = () => {
                 <div className="section-header">
                   <h3>
                     <Icon name="user" size={20} />
-                    Job Match Analysis
-                    <span className="optional-badge">Optional</span>
+                    Target Job Description
+                    <span className="optional-badge">Recommended</span>
                   </h3>
                   <button className="toggle-btn" onClick={() => setShowJobMatch(!showJobMatch)}>
                     {showJobMatch ? 'Hide' : 'Show'}
@@ -718,13 +620,14 @@ const ResumeAnalyzer = () => {
                   <div className="job-input-container">
                     <textarea
                       className="job-description-input"
-                      placeholder="Paste the job description here for targeted keyword matching and compatibility scoring…"
+                      placeholder="Paste the job description here — the ATS resume we generate will be tailored specifically to it…"
                       value={jobDescription}
                       onChange={(e) => setJobDescription(e.target.value)}
                       rows={6}
                     />
                     <p className="input-hint">
-                      We'll calculate a live job-match percentage and surface missing keywords from the posting.
+                      We'll calculate a job-match score, surface missing keywords from the posting, and mirror its
+                      language in your ATS-optimized resume.
                     </p>
                   </div>
                 )}
@@ -741,7 +644,7 @@ const ResumeAnalyzer = () => {
             {file && !error && (
               <button onClick={handleAnalyze} className="btn-analyze" disabled={loading}>
                 {loading ? (
-                  <><div className="button-spinner" />Analyzing…</>
+                  <><div className="button-spinner" />Analyzing every line…</>
                 ) : (
                   <><Icon name="sparkle" size={20} />Analyze Resume</>
                 )}
@@ -751,12 +654,12 @@ const ResumeAnalyzer = () => {
             {/* Feature cards */}
             <div className="features-grid">
               {[
-                { icon: 'check', title: 'ATS Compatibility', desc: 'Ensure your resume passes applicant tracking systems with 90%+ compatibility.' },
-                { icon: 'zap',   title: 'Real-time Scoring', desc: 'Instant feedback across formatting, keywords, content quality, and structure.' },
-                { icon: 'search',title: 'Keyword Optimization', desc: 'Identify and add industry-relevant keywords to rank higher in searches.' },
-                { icon: 'file-text', title: 'ATS Resume Builder', desc: 'Auto-generate a clean, ATS-ready resume from your analysis in one click.' },
-                { icon: 'user',  title: 'Job Matching', desc: 'Compare against job descriptions for a live compatibility percentage.' },
-                { icon: 'download', title: 'PDF / DOCX Export', desc: 'Download your optimized resume in your preferred format.' },
+                { icon: 'check', title: 'ATS Compatibility', desc: 'Full structural audit — headings, contact info, bullet usage, and layout risk factors.' },
+                { icon: 'zap',   title: 'Line-by-Line Review', desc: 'Every strength and weakness in your resume, called out individually — not vague generalities.' },
+                { icon: 'search',title: 'Keyword Optimization', desc: 'Identify missing and matched keywords against the role you\'re targeting.' },
+                { icon: 'file-text', title: 'Format Checker', desc: 'Deterministic checks for length, metrics, contact details, and ATS-unfriendly layout.' },
+                { icon: 'user',  title: 'Job Description Matching', desc: 'Paste a JD and get a live compatibility score plus tailored language.' },
+                { icon: 'download', title: 'Word / PDF Export', desc: 'Download a properly formatted, ATS-safe resume as a real .docx or .pdf.' },
               ].map(({ icon, title, desc }) => (
                 <div className="feature-card" key={title}>
                   <div className="feature-icon"><Icon name={icon} size={32} /></div>
@@ -785,14 +688,22 @@ const ResumeAnalyzer = () => {
                     key={fmt}
                     className="export-btn"
                     onClick={() => handleDownload(fmt)}
+                    disabled={downloadingFmt === fmt}
                     title={`Download as ${fmt.toUpperCase()}`}
                   >
-                    <Icon name="download" size={18} />
+                    {downloadingFmt === fmt ? <div className="button-spinner small" /> : <Icon name="download" size={18} />}
                     {fmt.toUpperCase()}
                   </button>
                 ))}
               </div>
             </div>
+
+            {analysis.overallVerdict && (
+              <div className="verdict-banner">
+                <Icon name="sparkle" size={20} />
+                <p>{analysis.overallVerdict}</p>
+              </div>
+            )}
 
             {/* Job Match Banner */}
             {jms !== null && (
@@ -808,8 +719,20 @@ const ResumeAnalyzer = () => {
                   <div className="jmb-fill" style={{ width: `${jms}%`, background: getScoreColor(jms) }} />
                 </div>
                 <span className="jmb-label">
-                  {jms >= 75 ? 'Strong match' : jms >= 50 ? 'Moderate match' : 'Low match — add more keywords'}
+                  {analysis.jobMatchNotes
+                    ? analysis.jobMatchNotes
+                    : jms >= 75 ? 'Strong match' : jms >= 50 ? 'Moderate match' : 'Low match — add more keywords'}
                 </span>
+              </div>
+            )}
+
+            {/* Red flags, if any */}
+            {(analysis.redFlags || []).length > 0 && (
+              <div className="red-flags-banner">
+                <h4><Icon name="alert" size={18} />Recruiter Red Flags</h4>
+                <ul>
+                  {analysis.redFlags.map((flag, i) => <li key={i}>{flag}</li>)}
+                </ul>
               </div>
             )}
 
@@ -884,10 +807,10 @@ const ResumeAnalyzer = () => {
                   {/* Quick Stats */}
                   <div className="quick-stats-grid">
                     {[
-                      { label: 'Strengths', value: analysis.strengths?.length || 0, gradient: 'linear-gradient(135deg,#43e97b,#38d9a9)', icon: 'zap' },
-                      { label: 'Improvements', value: analysis.improvements?.length || 0, gradient: 'linear-gradient(135deg,#f6c90e,#f9ca24)', icon: 'edit' },
+                      { label: 'Positives', value: analysis.positives?.length || 0, gradient: 'linear-gradient(135deg,#43e97b,#38d9a9)', icon: 'check' },
+                      { label: 'Issues Found', value: analysis.negatives?.length || 0, gradient: 'linear-gradient(135deg,#f5576c,#f093fb)', icon: 'alert' },
                       { label: 'Missing Keywords', value: analysis.keywordGaps?.length || 0, gradient: 'linear-gradient(135deg,#667eea,#764ba2)', icon: 'search' },
-                      { label: 'Sections Analyzed', value: analysis.sectionFeedback?.length || 0, gradient: 'linear-gradient(135deg,#4facfe,#00f2fe)', icon: 'layers' },
+                      { label: 'Format Checks Passed', value: `${formatChecks?.passedCount ?? 0}/${formatChecks?.totalChecks ?? 0}`, gradient: 'linear-gradient(135deg,#4facfe,#00f2fe)', icon: 'file-text' },
                     ].map(({ label, value, gradient, icon }) => (
                       <div className="stat-card" key={label}>
                         <div className="stat-icon" style={{ background: gradient }}>
@@ -901,7 +824,7 @@ const ResumeAnalyzer = () => {
                     ))}
                   </div>
 
-                  {/* Insights */}
+                  {/* Quick insights */}
                   <div className="insights-grid">
                     <div className="insights-card strengths">
                       <h3>
@@ -969,7 +892,6 @@ const ResumeAnalyzer = () => {
                           </div>
                           <p className="section-feedback">{item.feedback}</p>
 
-                          {/* Suggestions chips */}
                           {item.suggestions && item.suggestions.length > 0 && (
                             <div className="section-suggestions">
                               {item.suggestions.map((sug, si) => (
@@ -980,6 +902,48 @@ const ResumeAnalyzer = () => {
                         </div>
                       ))}
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Positives */}
+              {activeTab === 'positives' && (
+                <div className="tab-panel">
+                  <div className="point-list-card positives-card">
+                    <h3><Icon name="check" size={22} />Everything Working In Your Favor</h3>
+                    <p className="section-intro">Point-by-point list of every strong item found in your resume.</p>
+                    <ul className="point-list">
+                      {(analysis.positives || []).map((p, i) => (
+                        <li key={i} className="point-item positive">
+                          <span className="point-icon"><Icon name="check" size={16} /></span>
+                          <span>{p}</span>
+                        </li>
+                      ))}
+                      {(analysis.positives || []).length === 0 && (
+                        <p className="empty-hint">No specific positives were detected — try re-running the analysis.</p>
+                      )}
+                    </ul>
+                  </div>
+                </div>
+              )}
+
+              {/* Negatives */}
+              {activeTab === 'negatives' && (
+                <div className="tab-panel">
+                  <div className="point-list-card negatives-card">
+                    <h3><Icon name="alert" size={22} />Everything Working Against You</h3>
+                    <p className="section-intro">Every issue found, called out individually with the reason it hurts your ATS score.</p>
+                    <ul className="point-list">
+                      {(analysis.negatives || []).map((n, i) => (
+                        <li key={i} className="point-item negative">
+                          <span className="point-icon"><Icon name="x" size={16} /></span>
+                          <span>{n}</span>
+                        </li>
+                      ))}
+                      {(analysis.negatives || []).length === 0 && (
+                        <p className="empty-hint">No major issues detected. Nice work.</p>
+                      )}
+                    </ul>
                   </div>
                 </div>
               )}
@@ -998,54 +962,51 @@ const ResumeAnalyzer = () => {
                           <span className="keyword-stat-value">{analysis.keywordGaps?.length || 0}</span>
                           <span className="keyword-stat-label">Missing</span>
                         </div>
+                        <div className="keyword-stat">
+                          <span className="keyword-stat-value" style={{ color: '#43e97b' }}>{analysis.keywordsFound?.length || 0}</span>
+                          <span className="keyword-stat-label">Found</span>
+                        </div>
                         {addedKeywords.size > 0 && (
                           <div className="keyword-stat">
-                            <span className="keyword-stat-value" style={{ color: '#43e97b' }}>{addedKeywords.size}</span>
+                            <span className="keyword-stat-value" style={{ color: '#4facfe' }}>{addedKeywords.size}</span>
                             <span className="keyword-stat-label">Tracked</span>
                           </div>
                         )}
                       </div>
                     </div>
 
+                    {(analysis.keywordsFound || []).length > 0 && (
+                      <div className="keyword-category" style={{ marginBottom: 28 }}>
+                        <h4><Icon name="check" size={18} />Already Present</h4>
+                        <div className="keywords-list">
+                          {analysis.keywordsFound.map((kw, ki) => (
+                            <span key={ki} className="keyword-tag keyword-added">{kw}</span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     {(analysis.keywordGaps || []).length > 0 ? (
                       <>
                         <div className="keywords-intro">
                           <p>
                             These keywords are absent from your resume. Click{' '}
-                            <strong>+</strong> to mark them as added — the job-match score updates live.
+                            <strong>+</strong> to mark them as added — the ATS resume regenerator will weave them in.
                           </p>
                         </div>
 
-                        <div className="keywords-categories">
-                          {[
-                            {
-                              label: 'Technical Skills',
-                              icon: 'zap',
-                              items: (analysis.keywordGaps || []).filter((_, i) => i % 2 === 0),
-                            },
-                            {
-                              label: 'Soft Skills & Competencies',
-                              icon: 'user',
-                              items: (analysis.keywordGaps || []).filter((_, i) => i % 2 !== 0),
-                            },
-                          ].map(({ label, icon, items }) => (
-                            <div className="keyword-category" key={label}>
-                              <h4>
-                                <Icon name={icon} size={18} />
-                                {label}
-                              </h4>
-                              <div className="keywords-list">
-                                {items.map((kw, ki) => (
-                                  <KeywordTag
-                                    key={ki}
-                                    keyword={kw}
-                                    added={addedKeywords.has(kw)}
-                                    onAdd={toggleKeyword}
-                                  />
-                                ))}
-                              </div>
-                            </div>
-                          ))}
+                        <div className="keyword-category">
+                          <h4><Icon name="zap" size={18} />Missing Keywords</h4>
+                          <div className="keywords-list">
+                            {(analysis.keywordGaps || []).map((kw, ki) => (
+                              <KeywordTag
+                                key={ki}
+                                keyword={kw}
+                                added={addedKeywords.has(kw)}
+                                onAdd={toggleKeyword}
+                              />
+                            ))}
+                          </div>
                         </div>
 
                         {addedKeywords.size > 0 && (
@@ -1090,47 +1051,26 @@ const ResumeAnalyzer = () => {
                 </div>
               )}
 
-              {/* Improvements */}
-              {activeTab === 'improvements' && (
+              {/* Format Check */}
+              {activeTab === 'format' && (
                 <div className="tab-panel">
-                  <div className="improvements-card">
-                    <div className="improvements-header">
-                      <h3>
-                        <Icon name="zap" size={24} />
-                        Recommended Improvements
-                      </h3>
-                      <div className="impact-legend">
-                        {['high', 'medium', 'low'].map((lvl) => (
-                          <span key={lvl} className={`legend-item ${lvl}`}>
-                            <span className="legend-dot" />
-                            {lvl.charAt(0).toUpperCase() + lvl.slice(1)} Impact
+                  <div className="format-check-card">
+                    <h3><Icon name="file-text" size={22} />Format & Structure Check</h3>
+                    <p className="section-intro">
+                      Deterministic checks run against your resume's raw structure, independent of the AI review.
+                    </p>
+                    <div className="format-checks-list">
+                      {(formatChecks?.checks || []).map((c, i) => (
+                        <div key={i} className={`format-check-item ${c.passed ? 'pass' : 'fail'}`}>
+                          <span className="format-check-icon">
+                            <Icon name={c.passed ? 'check' : 'x'} size={16} />
                           </span>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="improvements-list">
-                      {(analysis.improvements || []).map((imp, i, arr) => {
-                        const impact = getImpact(i, arr.length);
-                        return (
-                          <div key={i} className={`improvement-item impact-${impact}`}>
-                            <div className="improvement-icon">{impactIcon(impact)}</div>
-                            <div className="improvement-content">
-                              <div className="improvement-header-row">
-                                <h4>{imp}</h4>
-                                <span className={`impact-badge ${impact}`}>
-                                  {impact.charAt(0).toUpperCase() + impact.slice(1)} Impact
-                                </span>
-                              </div>
-                              <p className="improvement-description">
-                                {impact === 'high' && 'Critical — will significantly improve your ATS score.'}
-                                {impact === 'medium' && 'Important — will noticeably enhance resume effectiveness.'}
-                                {impact === 'low' && 'Minor enhancement for additional polish.'}
-                              </p>
-                            </div>
+                          <div>
+                            <strong>{c.check}</strong>
+                            <p>{c.detail}</p>
                           </div>
-                        );
-                      })}
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>
@@ -1149,6 +1089,7 @@ const ResumeAnalyzer = () => {
                         </h3>
                         <p className="ats-resume-subtitle">
                           Clean, ATS-safe formatting · No tables, columns, or images · Machine-readable
+                          {jobDescription ? ' · Tailored to your target job description' : ''}
                         </p>
                       </div>
                       <div className="ats-resume-actions">
@@ -1188,6 +1129,7 @@ const ResumeAnalyzer = () => {
                         { label: 'Standard fonts', ok: true },
                         { label: 'Readable headings', ok: true },
                         { label: `${addedKeywords.size} keywords tracked`, ok: addedKeywords.size > 0 },
+                        { label: jobDescription ? 'Tailored to JD' : 'No JD provided', ok: !!jobDescription },
                       ].map(({ label, ok }) => (
                         <div key={label} className={`ats-quality-chip ${ok ? 'ok' : 'warn'}`}>
                           {ok ? <Icon name="check" size={14} /> : <Icon name="info" size={14} />}
@@ -1229,8 +1171,13 @@ const ResumeAnalyzer = () => {
                     <div className="ats-download-row">
                       <span className="export-label">Download as:</span>
                       {['pdf', 'docx', 'txt'].map((fmt) => (
-                        <button key={fmt} className="export-btn" onClick={() => handleDownload(fmt)}>
-                          <Icon name="download" size={18} />
+                        <button
+                          key={fmt}
+                          className="export-btn"
+                          onClick={() => handleDownload(fmt)}
+                          disabled={downloadingFmt === fmt}
+                        >
+                          {downloadingFmt === fmt ? <div className="button-spinner small" /> : <Icon name="download" size={18} />}
                           {fmt.toUpperCase()}
                         </button>
                       ))}

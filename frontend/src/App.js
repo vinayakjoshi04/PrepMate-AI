@@ -4,8 +4,7 @@ import { supabase } from "./supabaseClient";
 
 // Auth Pages
 import Home from "./auth/Home";
-import Login from "./auth/Login";
-import Signup from "./auth/Signup";
+import AuthPage from "./auth/AuthPage";
 
 // Protected Pages
 import Dashboard from "./pages/Dashboard";
@@ -81,14 +80,14 @@ function App() {
         {/* Public Landing Page */}
         <Route path="/" element={<Home />} />
 
-        {/* Authentication Routes */}
+        {/* Authentication Routes (single sliding AuthPage handles both) */}
         <Route
           path="/login"
-          element={session ? <Navigate to={defaultRedirect} replace /> : <Login />}
+          element={session ? <Navigate to={defaultRedirect} replace /> : <AuthPage initialMode="login" />}
         />
         <Route
           path="/signup"
-          element={session ? <Navigate to={defaultRedirect} replace /> : <Signup />}
+          element={session ? <Navigate to={defaultRedirect} replace /> : <AuthPage initialMode="signup" />}
         />
 
         {/* Protected Candidate Routes */}
