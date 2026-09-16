@@ -43,3 +43,4 @@ Thumbs.db
 .idea/
 
 backend/uploads/media/
+backend/uploads/recordings/
