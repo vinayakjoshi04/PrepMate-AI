@@ -5,8 +5,11 @@
 #
 # All resume-analysis logic (extraction, format checks, prompts, AI calls,
 # ATS resume generation, docx/pdf export) lives in resumeanalyzer.py.
+#
+# Recordings are now stored on local disk (uploads/recordings/) instead of
+# Supabase — see local_storage.py. Served back out via /api/recordings/<path>.
 
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify, send_file, send_from_directory
 from flask_cors import CORS
 import traceback
 import os
@@ -42,12 +45,16 @@ CORS(app, resources={
 app.register_blueprint(interview_bp)
 
 UPLOAD_FOLDER = 'uploads'
+RECORDINGS_DIR = os.path.join(UPLOAD_FOLDER, "recordings")
 
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
+if not os.path.exists(RECORDINGS_DIR):
+    os.makedirs(RECORDINGS_DIR)
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-app.config['MAX_CONTENT_LENGTH'] = 60 * 1024 * 1024  # raised to allow video uploads
+# Raised from 60MB -> 320MB: recordings can now run up to 10 minutes/answer.
+app.config['MAX_CONTENT_LENGTH'] = 320 * 1024 * 1024
 
 
 # ─── Preflight ────────────────────────────────────────────────────────────────
@@ -82,7 +89,8 @@ def root():
             "analyze_resume": "/api/analyze-resume",
             "generate_ats_resume": "/api/generate-ats-resume",
             "export_resume": "/api/export-resume",
-            "skill_gap": "/api/skill-gap"
+            "skill_gap": "/api/skill-gap",
+            "recordings": "/api/recordings/<path>"
         }
     }), 200
 
@@ -99,10 +107,14 @@ def health_check():
     }), 200
 
 
+# ─── Serve locally-stored recordings ───────────────────────────────────────
+
+@app.route("/api/recordings/<path:filepath>", methods=["GET"])
+def serve_recording(filepath):
+    return send_from_directory(RECORDINGS_DIR, filepath)
+
+
 # ─── Analyze Resume ───────────────────────────────────────────────────────────
-# Full, deep, point-by-point analysis: ATS score, section feedback,
-# positives/negatives on every line, keyword gaps, format checks, and
-# (if a JD is supplied) a job-match score.
 
 @app.route("/api/analyze-resume", methods=["POST"])
 def analyze_resume():
@@ -163,9 +175,6 @@ def analyze_resume():
 
 
 # ─── Generate / Regenerate ATS Resume ────────────────────────────────────────
-# Used by the "Regenerate" button — takes the existing analysis + optional
-# job description + keywords the user marked as added, and produces a
-# fresh ATS-tailored resume text.
 
 @app.route("/api/generate-ats-resume", methods=["POST"])
 def generate_ats_resume_route():
@@ -200,7 +209,6 @@ def export_resume():
         if fmt not in {"pdf", "docx", "txt"}:
             return jsonify({"error": f"Unsupported format: {fmt}"}), 400
 
-        # Guard against JSON/error payloads accidentally being sent as content
         content, sanitize_error = ra.sanitize_export_content(raw_content)
         if sanitize_error:
             print(f"⚠️  Export blocked — bad content: {sanitize_error}")
@@ -367,7 +375,7 @@ def not_found(error):
             "/api/analyze-answer", "/api/batch-analyze-answers",
             "/api/analyze-video", "/api/analyze-audio", "/api/analyze-multimodal",
             "/api/analyze-resume", "/api/generate-ats-resume", "/api/export-resume",
-            "/api/skill-gap"
+            "/api/skill-gap", "/api/recordings/<path>"
         ]
     }), 404
 
@@ -377,7 +385,7 @@ def internal_error(error):
 
 @app.errorhandler(413)
 def file_too_large(error):
-    return jsonify({"error": "File too large. Maximum size is 60MB."}), 413
+    return jsonify({"error": "File too large. Maximum size is 320MB."}), 413
 
 
 # ─── Entry Point ──────────────────────────────────────────────────────────────

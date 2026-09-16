@@ -1,0 +1,52 @@
+[
+  {
+    "sessionId": "interview_1789530025123",
+    "questionId": "1",
+    "storagePath": "interview_1789530025123/1_tmpi3ecqjy5.webm",
+    "userId": "9d21286a-6e11-4acf-8e1a-c34d8f6002cf",
+    "jobTitle": "Python Engineer",
+    "experienceLevel": "Entry Level",
+    "durationSec": 61.1,
+    "savedAt": 1789530201.8499746
+  },
+  {
+    "sessionId": "interview_1789533830899",
+    "questionId": "1",
+    "storagePath": "interview_1789533830899/1_tmpo7viv36o.webm",
+    "userId": "9d21286a-6e11-4acf-8e1a-c34d8f6002cf",
+    "jobTitle": "Python ENgineer",
+    "experienceLevel": "Entry Level",
+    "durationSec": 60.7,
+    "savedAt": 1789534016.088761
+  },
+  {
+    "sessionId": "interview_1789533830899",
+    "questionId": "2",
+    "storagePath": "interview_1789533830899/2_tmpdh3qt6p1.webm",
+    "userId": "9d21286a-6e11-4acf-8e1a-c34d8f6002cf",
+    "jobTitle": "Python ENgineer",
+    "experienceLevel": "Entry Level",
+    "durationSec": 61.2,
+    "savedAt": 1789534038.74069
+  },
+  {
+    "sessionId": "interview_1789534516077",
+    "questionId": "1",
+    "storagePath": "interview_1789534516077/1_tmp079785_v.webm",
+    "userId": "9d21286a-6e11-4acf-8e1a-c34d8f6002cf",
+    "jobTitle": "Python ENgineer",
+    "experienceLevel": "Entry Level",
+    "durationSec": 40.8,
+    "savedAt": 1789534594.2909496
+  },
+  {
+    "sessionId": "interview_1789534827977",
+    "questionId": "1",
+    "storagePath": "interview_1789534827977/1_tmp38oi478f.webm",
+    "userId": "9d21286a-6e11-4acf-8e1a-c34d8f6002cf",
+    "jobTitle": "python Engineer",
+    "experienceLevel": "Entry Level",
+    "durationSec": 54.4,
+    "savedAt": 1789534916.711054
+  }
+]

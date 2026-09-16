@@ -17,13 +17,15 @@ from huggingfaceService import (
 )
 from video_analysis import analyze_video
 from audio_analysis import analyze_audio
-from supabase_storage import upload_recording, save_recording_metadata, get_fresh_signed_url
+from local_storage import upload_recording, save_recording_metadata, get_fresh_signed_url
 
 interview_bp = Blueprint("interview", __name__)
 
 MEDIA_UPLOAD_FOLDER = "uploads/media"
 ALLOWED_MEDIA_EXTENSIONS = {"webm", "mp4", "mov", "wav", "mp3", "m4a", "ogg"}
-MAX_MEDIA_SIZE = 60 * 1024 * 1024
+# Raised from 60MB -> 300MB to comfortably support recordings up to the new
+# 10-minute-per-answer cap (webm/vp9+opus at 10 min can land well past 60MB).
+MAX_MEDIA_SIZE = 300 * 1024 * 1024
 BATCH_CHUNK_SIZE = 5
 
 if not os.path.exists(MEDIA_UPLOAD_FOLDER):
@@ -61,7 +63,9 @@ def _convert_to_mp4(input_path):
                 "-c:a", "aac", "-ar", "16000", "-ac", "1",
                 out_path,
             ],
-            capture_output=True, text=True, timeout=60,
+            # Raised from 60s -> 300s: a 10-minute source clip takes
+            # meaningfully longer to re-encode than the old ~1-minute cap did.
+            capture_output=True, text=True, timeout=300,
         )
         if result.returncode != 0 or not os.path.exists(out_path):
             print(f"⚠️  ffmpeg conversion failed for {input_path}: {result.stderr[-500:]}")
@@ -192,11 +196,7 @@ def _allowed_media(filename):
 def _save_media_file(file_storage):
     """
     Saves the uploaded file to a temp path and returns (path, error).
-    BUGFIX: MAX_MEDIA_SIZE was defined but never actually enforced anywhere
-    in the app — any size file would be accepted and pushed through
-    ffmpeg/mediapipe/whisper, which is both a resource-exhaustion risk and a
-    bad user experience (long hang instead of a fast, clear rejection).
-    Now checks size right after saving and rejects oversized uploads.
+    Enforces MAX_MEDIA_SIZE right after saving and rejects oversized uploads.
     """
     filename = secure_filename(file_storage.filename)
     suffix = filename.rsplit('.', 1)[1].lower() if '.' in filename else 'webm'
@@ -312,11 +312,6 @@ def analyze_answer():
             return jsonify({"error": "No data provided"}), 400
 
         question = data.get('question', '') or ''
-        # BUGFIX: data.get('answer', '') only falls back to '' when the key
-        # is MISSING. If the client sends {"answer": null} explicitly, this
-        # returns None and the very next line (answer.strip()) throws,
-        # falling through to the generic except-fallback below instead of
-        # being handled cleanly. Coalesce explicitly.
         answer = data.get('answer', '') or ''
         round_num = data.get('round')
         job_title = data.get('jobTitle', '') or ''
@@ -626,11 +621,6 @@ def analyze_multimodal():
         return jsonify({"error": f"Server error: {str(e)}"}), 500
 
     finally:
-        # BUGFIX: media_path cleanup used to happen inline right before the
-        # success-path `return`. If anything between saving the file and
-        # that line raised (e.g. generate_behavioral_report or repair_json),
-        # the temp upload was never deleted — a slow disk leak on every
-        # failed request. Now guaranteed via finally regardless of outcome.
         if media_path:
             _cleanup(media_path)
 
@@ -667,7 +657,8 @@ def analyze_interview_batch():
         for it in items:
             qid = str(it.get("questionId"))
             skipped_flag = it.get("skipped")
-            print(f"   → item qid={qid} skipped={skipped_flag} isCoding={it.get('isCoding')}")
+            print(f"   → item qid={qid} skipped={skipped_flag} isCoding={it.get('isCoding')} "
+                  f"hasRecordedClip={it.get('hasRecordedClip')}")
 
             if skipped_flag:
                 skipped_out[qid] = {
@@ -681,8 +672,14 @@ def analyze_interview_batch():
             video_metrics, audio_metrics = None, None
             answer_text = it.get("answerText", "") or ""
             is_coding = bool(it.get("isCoding"))
+            # FIX: this used to be gated on `not is_coding`, so a coding
+            # question's uploaded clip was never even looked up, let alone
+            # analyzed — regardless of whether a recording actually existed.
+            # Now it's gated on hasRecordedClip, which reflects reality
+            # (mediaStore) rather than assuming "coding = no recording".
+            has_clip = bool(it.get("hasRecordedClip"))
 
-            if not is_coding:
+            if has_clip:
                 file_key = f"video_{qid}"
                 file = request.files.get(file_key)
                 print(f"   → looking for file key '{file_key}': {'FOUND' if file else 'NOT FOUND'}")
@@ -693,14 +690,19 @@ def analyze_interview_batch():
                     else:
                         saved_paths.append(path)
                         video_metrics, audio_metrics = _run_full_analysis(path, qid_label=f"q{qid}")
-                        if not answer_text.strip() and audio_metrics and audio_metrics.get("transcript"):
+
+                        # Only borrow the Whisper transcript as the answer text for
+                        # SPOKEN questions with no typed content. For coding questions
+                        # the submitted code is always the answer — the transcript is
+                        # only used for the attentiveness notes, never overwrites code.
+                        if not is_coding and not answer_text.strip() and audio_metrics and audio_metrics.get("transcript"):
                             answer_text = audio_metrics["transcript"]
 
-                        # ── Persist the recording to Supabase before cleanup ──
+                        # ── Persist the recording locally before cleanup ──
                         remote_name = f"{session_id}/{qid}_{os.path.basename(path)}"
                         recording_url = upload_recording(path, remote_name)
                         if recording_url:
-                            print(f"   ☁️  [{qid}] Uploaded to Supabase: {remote_name}")
+                            print(f"   💾 [{qid}] Saved locally: {remote_name}")
                             save_recording_metadata(
                                 session_id=session_id,
                                 question_id=qid,
@@ -711,9 +713,12 @@ def analyze_interview_batch():
                                 duration_sec=audio_metrics.get("speakingDurationSec") if audio_metrics else None,
                             )
                         else:
-                            print(f"   ⚠️  [{qid}] Supabase upload failed — continuing without persistence")
+                            print(f"   ⚠️  [{qid}] Local save failed — continuing without persistence")
                 else:
-                    print(f"   ⚠️  No usable file for qid={qid} — this question will be scored with empty content")
+                    print(f"   ⚠️  hasRecordedClip=True but no usable file found for qid={qid} "
+                          f"— this question will be scored with empty/text-only content")
+            else:
+                print(f"   → qid={qid} has no recorded clip — skipping video/audio analysis")
 
             if not answer_text.strip():
                 answer_text = "(No answer content available.)"
@@ -792,16 +797,11 @@ def analyze_interview_batch():
         return jsonify({"error": f"Server error: {str(e)}"}), 500
 
     finally:
-        # BUGFIX: cleanup of saved_paths previously happened as a plain loop
-        # near the end of the try block. Any exception raised earlier in
-        # processing (a malformed LLM response, a scoring cast error, etc.)
-        # would skip that loop entirely and leak every uploaded clip for
-        # this request. Now guaranteed via finally.
         for p in saved_paths:
             _cleanup(p)
 
 
-# ─── Fetch a fresh signed URL for a stored recording ───────────────────────
+# ─── Fetch a fresh URL for a stored recording ───────────────────────
 
 @interview_bp.route("/api/get-recording-url", methods=["GET"])
 def get_recording_url():

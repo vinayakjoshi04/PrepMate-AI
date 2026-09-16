@@ -492,6 +492,13 @@ def generate_batch_behavioral_report(items, job_title, experience_level):
       {"index": int, "question": str, "answerText": str, "isCoding": bool,
        "videoMetrics": dict|None, "audioMetrics": dict|None}
 
+    Coding items may now ALSO carry videoMetrics/audioMetrics if the person
+    recorded themselves while coding (recording is mandatory for every
+    non-skipped question, coding or not). When that happens we don't discard
+    the signal — we use it to note attentiveness (looking away, long
+    unexplained silences, speech not matching what's typed), while keeping
+    contentScore based purely on code quality/correctness.
+
     Returns raw text (expected to be JSON: {"results": [...]}).
     """
     blocks = []
@@ -499,10 +506,26 @@ def generate_batch_behavioral_report(items, job_title, experience_level):
         vb, ab, note = _build_signal_blocks(
             it.get("answerText", ""), it.get("videoMetrics"), it.get("audioMetrics")
         )
-        kind = (
-            "CODING ANSWER (evaluate correctness, efficiency, code quality — no delivery signal exists)"
-            if it.get("isCoding") else "SPOKEN ANSWER"
+        has_clip = bool(
+            (it.get("videoMetrics") and "error" not in it["videoMetrics"]) or
+            (it.get("audioMetrics") and "error" not in it["audioMetrics"])
         )
+
+        if it.get("isCoding") and has_clip:
+            kind = (
+                "CODING ANSWER WITH RECORDING — evaluate code correctness/efficiency/quality "
+                "for contentScore as usual, based only on the code itself. Separately, use the "
+                "body-language/vocal signals below to note attentiveness in nonverbalNotes/"
+                "vocalNotes: sustained looking away from the screen, long silences while typing "
+                "with no verbal reasoning, or speech that doesn't match what's being typed. "
+                "Phrase this neutrally as an observation (e.g. 'looked away from the screen for "
+                "extended periods'), not an accusation of cheating."
+            )
+        elif it.get("isCoding"):
+            kind = "CODING ANSWER, NO RECORDING (evaluate correctness, efficiency, code quality only)"
+        else:
+            kind = "SPOKEN ANSWER"
+
         blocks.append(
             f"[{it['index']}] {kind}\n"
             f"Question: {it['question'][:250]}\n"
@@ -513,12 +536,18 @@ def generate_batch_behavioral_report(items, job_title, experience_level):
 
     prompt = f"""You are an expert interview coach scoring a {experience_level} {job_title} candidate's
 full interview. Below are {len(items)} answers, some spoken (with body-language/vocal signals attached)
-and some coding answers (evaluate code correctness/efficiency instead of delivery).
+and some coding answers — some of which ALSO have body-language/vocal signals attached because the
+candidate recorded themselves while solving the problem.
 
 {chr(10).join(blocks)}
 
-For each item, combine ALL available signals (skip any marked "Not available") into one holistic score.
-For CODING answers, deliveryScore should equal contentScore (no vocal/video signal exists) and
+For SPOKEN answers, combine ALL available signals into one holistic score as usual.
+
+For CODING answers: contentScore/deliveryScore/overallScore should always be based purely on the
+code's correctness, efficiency, and quality — never adjusted up or down because of body language or
+vocal delivery. If a recording exists for a coding answer, still use nonverbalNotes/vocalNotes to
+describe attentiveness patterns from the footage (factual, 1-2 sentences, neutral tone — not an
+accusation). If no recording exists for a coding answer, deliveryScore should equal contentScore and
 nonverbalNotes/vocalNotes should be empty strings.
 
 Return ONLY valid JSON (no markdown):
@@ -547,6 +576,8 @@ all scores 0-10 integers, arrays 2-3 items, return ONLY JSON."""
         system_prompt=(
             "You are an expert interview coach that scores multiple answers — spoken and coding — "
             "in one pass, fusing content with body language and vocal delivery data where available. "
+            "For coding answers, code quality alone determines the score; any recording is used only "
+            "for a neutral attentiveness note, never to adjust the score. "
             "Respond with ONLY valid, complete JSON — no markdown, no extra commentary."
         )
     )

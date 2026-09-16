@@ -5,18 +5,28 @@
 #   pip install opencv-python-headless mediapipe numpy
 #
 # CHANGELOG (this revision):
-#   - BUGFIX: duration_sec (and therefore blinkRate) was computed purely from
-#     cv2.CAP_PROP_FRAME_COUNT / fps. For webm/vp9 uploads this container
-#     metadata is very often 0 or wrong (especially if the upstream ffmpeg
-#     re-encode step failed and analyze_video() got handed the raw webm),
-#     which silently made blinkRate always report 0 even though blinks were
-#     being detected correctly. Fixed by deriving duration from the actual
-#     number of frames decoded (frame_idx / fps) after the read loop, which
-#     is ground truth regardless of what the container header claims. This
-#     is now used everywhere duration is reported, including the early
-#     "no face detected" exit path.
+#   - CRITICAL BUGFIX: the previous version sampled a FIXED number of frames
+#     (max_frames_to_sample=150, every 3rd frame) no matter how long the
+#     video was. At a typical ~24fps that cap was hit after only ~450 raw
+#     frames = ~19 SECONDS into the clip, then the read loop `break`s and
+#     everything downstream (duration, blink rate, eye contact, posture,
+#     engagement score) silently reflects only the first ~19 seconds of a
+#     video that could be up to 10 minutes long — with no error, no warning,
+#     just quietly wrong numbers for the other 9 minutes 41 seconds.
 #
-# CHANGELOG (previous revision):
+#     FIX: switch from "sample N frames total" to "sample at a fixed RATE
+#     (frames per second of source video), for the entire video". This means
+#     a 20-second clip and a 10-minute clip both get evenly-spread coverage
+#     across their full length — a longer clip just means more (bounded)
+#     total samples, not truncation. TARGET_SAMPLE_FPS=2 means 2 analyzed
+#     frames per second of footage, so:
+#       - 1 min clip  -> ~120 samples analyzed
+#       - 10 min clip -> ~1200 samples analyzed (fully covered, not cut off)
+#     MAX_FRAMES_TO_SAMPLE is now a safety ceiling sized for the product's
+#     documented 10-minute recording cap (see MAX_RECORD_SECONDS in
+#     Interview.js), not an incidental truncation point.
+#
+# CHANGELOG (previous revisions):
 #   - postureScore is now ACTUALLY computed (previously documented but never
 #     returned) using MediaPipe Pose shoulder/nose alignment + slouch proxy.
 #   - Smile detection normalized per-face (uses mouth width / face width
@@ -30,6 +40,9 @@
 #     landmarks (falls back gracefully instead of crashing the request).
 #   - framesAnalyzed/faceDetectedPct now always returned, even on early exit,
 #     so the caller can tell "no face" apart from "video unreadable".
+#   - duration_sec is derived from frames actually decoded (frame_idx / fps)
+#     rather than trusting the container's CAP_PROP_FRAME_COUNT metadata,
+#     which is frequently 0 or wrong for webm/vp9 uploads.
 
 import cv2
 import numpy as np
@@ -40,7 +53,20 @@ try:
 except ImportError:
     MEDIAPIPE_AVAILABLE = False
 
-SAMPLE_EVERY_N_FRAMES = 3  # analyze every 3rd frame to keep it fast
+# ── Sampling configuration ──────────────────────────────────────────────
+# We analyze a fixed RATE of frames per second of source video, not a fixed
+# total count. This is what makes coverage scale correctly with video length
+# instead of truncating long videos.
+TARGET_SAMPLE_FPS = 2  # analyze 2 frames per second of footage
+
+# Safety ceiling on total samples, sized generously above the product's
+# documented max recording length (10 minutes — see MAX_RECORD_SECONDS in
+# Interview.js) so a normal 10-minute answer is NEVER truncated. This only
+# kicks in as a hard backstop against a pathological/corrupt file reporting
+# an absurd frame count, not as a routine limit.
+MAX_RECORD_SECONDS_SUPPORTED = 600  # 10 minutes
+MAX_FRAMES_TO_SAMPLE = TARGET_SAMPLE_FPS * MAX_RECORD_SECONDS_SUPPORTED * 2  # 2x headroom = 2400
+
 MIN_FRAMES_FOR_RELIABLE_RESULT = 8
 
 # MediaPipe FaceMesh landmark indices we care about
@@ -119,13 +145,23 @@ def _posture_sample(pose_landmarks):
         return None
 
 
-def analyze_video(file_path, max_frames_to_sample=150):
+def analyze_video(file_path, max_frames_to_sample=None):
     """
-    Analyze a short interview-answer video file.
+    Analyze an interview answer video file of ANY length up to the product's
+    documented recording cap (10 minutes). Samples at TARGET_SAMPLE_FPS
+    frames per second of source video, so coverage is spread evenly across
+    the whole clip instead of stopping after a fixed frame count.
+
+    `max_frames_to_sample`: optional override of the safety ceiling. Defaults
+    to MAX_FRAMES_TO_SAMPLE (sized for a 10-minute clip with 2x headroom).
+
     Returns a metrics dict, or a dict with 'error' if analysis could not run.
     """
     if not MEDIAPIPE_AVAILABLE:
         return {"error": "mediapipe not installed on server"}
+
+    if max_frames_to_sample is None:
+        max_frames_to_sample = MAX_FRAMES_TO_SAMPLE
 
     cap = cv2.VideoCapture(file_path)
     if not cap.isOpened():
@@ -164,15 +200,24 @@ def analyze_video(file_path, max_frames_to_sample=150):
     if fps <= 0 or fps > 240:
         fps = 24
 
+    # Sample at TARGET_SAMPLE_FPS frames per second of source video, so a
+    # 10-minute clip and a 20-second clip both get proportionate, even
+    # coverage — the interval scales with the video's own fps rather than
+    # using a hard-coded "every 3rd frame" that assumed short clips.
+    sample_every_n_frames = max(1, round(fps / TARGET_SAMPLE_FPS))
+
     try:
         while True:
             ret, frame = cap.read()
             if not ret:
                 break
             frame_idx += 1
-            if frame_idx % SAMPLE_EVERY_N_FRAMES != 0:
+            if frame_idx % sample_every_n_frames != 0:
                 continue
             if sampled >= max_frames_to_sample:
+                # Safety ceiling only — for a video within the documented
+                # 10-minute cap this should not be reached in practice
+                # given the 2x headroom baked into MAX_FRAMES_TO_SAMPLE.
                 break
             sampled += 1
 
@@ -224,11 +269,13 @@ def analyze_video(file_path, max_frames_to_sample=150):
         face_mesh.close()
         pose.close()
 
-    # BUGFIX: derive duration from frames actually decoded rather than the
+    # Duration derived from frames actually decoded rather than the
     # container's CAP_PROP_FRAME_COUNT metadata, which is frequently 0 or
-    # unreliable for webm/vp9 uploads (especially if the upstream ffmpeg
-    # re-encode step was skipped or failed). frame_idx is ground truth: it
-    # only increments once per frame genuinely read by cap.read().
+    # unreliable for webm/vp9 uploads. frame_idx is ground truth: it only
+    # increments once per frame genuinely read by cap.read(). Because
+    # sampling is now time-based and covers the WHOLE read loop (not cut
+    # short by a fixed sample-count truncation), this duration reflects the
+    # true length of the clip, not just the portion that got analyzed.
     duration_sec = (frame_idx / fps) if fps else 0
 
     if faces_found == 0:

@@ -11,6 +11,17 @@
 # output handling and was returning empty transcripts in testing.
 #
 # CHANGELOG (this revision):
+#   - NEW: _looks_degenerate() detects Whisper's known failure mode on
+#     unclear/silent/noisy audio, where it gets stuck repeating the same
+#     short token or phrase dozens of times (e.g. ", absolute, absolute,
+#     absolute, ..."). Previously this garbage text was passed straight
+#     through as the transcript — feeding nonsense into wordsPerMinute,
+#     fillerWordRate, and the LLM scoring prompt. Now, if the raw Whisper
+#     output looks degenerate, we discard it and report a clear
+#     transcriptionNote instead, and skip wpm/filler calculations that
+#     would otherwise be computed from garbage.
+#
+# CHANGELOG (earlier revisions):
 #   - BUGFIX: when _extract_wav() failed (pydub missing, clip too short,
 #     ffmpeg decode error, etc.) analyze_audio() silently discarded that
 #     error and tried to librosa.load() the ORIGINAL file instead (which is
@@ -18,8 +29,6 @@
 #     caller then saw a confusing generic "could not load audio: ..." error
 #     instead of the real, actionable reason. Fixed: if wav extraction fails,
 #     return that error immediately instead of guessing with a fallback load.
-#
-# CHANGELOG (earlier revisions):
 #   - FIXED: _transcribe() was passing generate_kwargs={"language": "en"} to
 #     the pipeline unconditionally. English-only checkpoints (any model name
 #     ending in ".en", e.g. the default "openai/whisper-tiny.en") reject
@@ -87,6 +96,11 @@ _FILLER_PATTERN = re.compile(
 MIN_WPM, MAX_WPM = 30, 220
 MIN_WORDS_FOR_WPM = 5
 
+# Minimum consecutive repeats of the same word/short-phrase before we call a
+# transcript "degenerate" and throw it out. Real speech essentially never
+# repeats one word or a 2-4 word phrase back-to-back this many times.
+_DEGENERATE_REPEAT_THRESHOLD = 8
+
 _whisper_pipe = None
 
 
@@ -130,6 +144,57 @@ def _extract_wav(input_path):
         return None, f"extraction failed: {e}"
 
 
+def _looks_degenerate(transcript):
+    """
+    Detects Whisper's known failure mode on unclear/quiet/noisy audio: it
+    gets stuck in a loop repeating the same short token or phrase, e.g.
+    ", absolute, absolute, absolute, absolute, ..." This is not real speech
+    content, so we want to catch it and treat the transcript as unusable
+    rather than feeding it into wpm/filler-rate math or the scoring prompt.
+    """
+    if not transcript or not transcript.strip():
+        return False
+
+    words = re.findall(r"[a-z0-9']+", transcript.lower())
+    if len(words) < _DEGENERATE_REPEAT_THRESHOLD:
+        return False
+
+    # Case 1: a single word repeated N+ times back-to-back.
+    run_len = 1
+    for i in range(1, len(words)):
+        if words[i] == words[i - 1]:
+            run_len += 1
+            if run_len >= _DEGENERATE_REPEAT_THRESHOLD:
+                return True
+        else:
+            run_len = 1
+
+    # Case 2: a short phrase (2-4 words) repeating back-to-back many times,
+    # e.g. "you know you know you know you know ...".
+    for phrase_len in (2, 3, 4):
+        if len(words) < phrase_len * _DEGENERATE_REPEAT_THRESHOLD:
+            continue
+        run_len = 1
+        i = phrase_len
+        while i + phrase_len <= len(words):
+            if words[i:i + phrase_len] == words[i - phrase_len:i]:
+                run_len += 1
+                if run_len >= _DEGENERATE_REPEAT_THRESHOLD:
+                    return True
+            else:
+                run_len = 1
+            i += phrase_len
+
+    # Case 3: overall vocabulary is extremely repetitive (few unique words
+    # relative to total length) — catches loops that don't perfectly align
+    # to a fixed phrase length but are still clearly stuck.
+    unique_ratio = len(set(words)) / len(words)
+    if len(words) >= 15 and unique_ratio < 0.15:
+        return True
+
+    return False
+
+
 def _transcribe(wav_path):
     """Transcribe using local transformers Whisper pipeline. Fully offline —
     no API key, no network call, no rate limits."""
@@ -153,6 +218,11 @@ def _transcribe(wav_path):
         text = (result.get("text") or "").strip()
         if not text:
             return "", "speech not understood (silence, noise, or too quiet)"
+
+        if _looks_degenerate(text):
+            print(f"   ⚠️  DEBUG transcript looked degenerate (repeated-token loop) — discarding: {text[:120]}")
+            return "", "transcription unreliable (unclear or noisy audio produced a repeated-word loop)"
+
         return text, None
     except Exception as e:
         print(f"   ❌ DEBUG whisper exception: {e}")
@@ -242,6 +312,9 @@ def analyze_audio(file_path):
     pause_ratio = round(min(silence_samples / len(y), 1.0) * 100, 1) if len(y) else 0
 
     transcript, transcribe_err = _transcribe(wav_path)
+    # transcript is already "" if _transcribe flagged it as degenerate — the
+    # wpm/filler-rate calculations below naturally come out as 0/None for an
+    # empty transcript, so no extra branching needed here.
     word_count = len(transcript.split()) if transcript else 0
 
     wpm = None

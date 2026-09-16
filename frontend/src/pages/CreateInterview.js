@@ -56,6 +56,57 @@ const ROUND_TEMPLATES = [
   },
 ];
 
+// ── Recording math constants ────────────────────────────────────────────
+// Mirrors backend/interview.py MIN_RECORD_SECONDS / MAX_RECORD_SECONDS in
+// Interview.js — a spoken answer can run anywhere from 1 to 10 minutes.
+// These are used to give the user a REALISTIC time/storage range up front,
+// instead of a single flat guess that was wrong once the min went from
+// 3 seconds to 1 minute.
+const MIN_RECORD_MINUTES = 1;
+const MAX_RECORD_MINUTES = 10;
+
+// Rough size of a 720p webm (vp9+opus) recording per minute of footage.
+// This varies with motion/lighting, so treat it as an estimate, not a hard
+// number — used only to give the user a sense of scale before they start.
+const EST_MB_PER_MINUTE = 10;
+
+/**
+ * Given a question count, returns the best/worst-case time range (in
+ * minutes) for ONE round, assuming every question is spoken (not coding).
+ * Coding questions don't record video, so this is a ceiling, not a promise.
+ */
+function estimateRoundTimeRange(questionCount) {
+  return {
+    minMinutes: questionCount * MIN_RECORD_MINUTES,
+    maxMinutes: questionCount * MAX_RECORD_MINUTES,
+  };
+}
+
+/**
+ * Given a question count and number of rounds, returns the combined
+ * time + storage range across the WHOLE interview.
+ */
+function estimateInterviewTotals(questionCount, roundCount) {
+  const totalQuestions = questionCount * roundCount;
+  const minMinutes = totalQuestions * MIN_RECORD_MINUTES;
+  const maxMinutes = totalQuestions * MAX_RECORD_MINUTES;
+  const minStorageMB = totalQuestions * MIN_RECORD_MINUTES * EST_MB_PER_MINUTE;
+  const maxStorageMB = totalQuestions * MAX_RECORD_MINUTES * EST_MB_PER_MINUTE;
+  return { totalQuestions, minMinutes, maxMinutes, minStorageMB, maxStorageMB };
+}
+
+function formatMinutes(mins) {
+  if (mins < 60) return `${mins}m`;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return m > 0 ? `${h}h ${m}m` : `${h}h`;
+}
+
+function formatStorage(mb) {
+  if (mb < 1000) return `${Math.round(mb)}MB`;
+  return `${(mb / 1000).toFixed(1)}GB`;
+}
+
 export default function CreateInterview() {
   const navigate = useNavigate();
 
@@ -131,10 +182,6 @@ export default function CreateInterview() {
   };
 
   // ── Camera/mic permission checkbox ──────────────────────────────────────
-  // We verify permissions here (step 3) rather than surprising the user with
-  // a browser prompt once the interview has already started. This is a
-  // simple checkbox now (not a toggle) — checking it triggers a real
-  // getUserMedia call to confirm access actually works before proceeding.
   const handlePermissionCheckbox = async (e) => {
     const checked = e.target.checked;
     setPermissionsChecked(checked);
@@ -145,7 +192,7 @@ export default function CreateInterview() {
     setPermissionStatus("checking");
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-      stream.getTracks().forEach(t => t.stop()); // just testing permission, release immediately
+      stream.getTracks().forEach(t => t.stop());
       setPermissionStatus("ok");
     } catch (err) {
       console.error("Permission check failed:", err);
@@ -257,6 +304,9 @@ export default function CreateInterview() {
       </div>
     );
   }
+
+  // ── Live estimates used in Step 3 ────────────────────────────────────────
+  const totals = estimateInterviewTotals(formData.questionsPerRound, selectedRounds.length || 1);
 
   return (
     <div className="create-interview-container">
@@ -396,21 +446,33 @@ export default function CreateInterview() {
               <div className="form-section">
                 <label className="form-label">Questions Per Round</label>
                 <div className="qcount-row">
-                  {[3, 5, 7, 10].map(n => (
-                    <button
-                      key={n}
-                      type="button"
-                      className={`qcount-btn ${formData.questionsPerRound === n ? "selected" : ""}`}
-                      onClick={() => setFormData(p => ({ ...p, questionsPerRound: n }))}
-                    >
-                      <span className="qcount-num">{n}</span>
-                      <span className="qcount-label">
-                        {n === 3 ? "Quick" : n === 5 ? "Standard" : n === 7 ? "Thorough" : "Deep Dive"}
-                      </span>
-                      <span className="qcount-time">~{n * 3} min</span>
-                    </button>
-                  ))}
+                  {[3, 5, 7, 10].map(n => {
+                    const { minMinutes, maxMinutes } = estimateRoundTimeRange(n);
+                    return (
+                      <button
+                        key={n}
+                        type="button"
+                        className={`qcount-btn ${formData.questionsPerRound === n ? "selected" : ""}`}
+                        onClick={() => setFormData(p => ({ ...p, questionsPerRound: n }))}
+                      >
+                        <span className="qcount-num">{n}</span>
+                        <span className="qcount-label">
+                          {n === 3 ? "Quick" : n === 5 ? "Standard" : n === 7 ? "Thorough" : "Deep Dive"}
+                        </span>
+                        {/* Was a flat "~{n*3} min" guess left over from the old
+                            3-second minimum. Now a real range: each spoken
+                            answer can run 1–10 minutes, so a round of n
+                            questions takes anywhere from n*1 to n*10 minutes. */}
+                        <span className="qcount-time">
+                          {formatMinutes(minMinutes)}–{formatMinutes(maxMinutes)} /round
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
+                <p className="form-hint">
+                  Range assumes all spoken questions (1–10 min each). Coding questions don't record video and won't count toward this.
+                </p>
               </div>
 
               <div className="form-section">
@@ -443,6 +505,35 @@ export default function CreateInterview() {
                     </button>
                   ))}
                 </div>
+              </div>
+
+              {/* ── Time & Storage Estimate (computed from questionsPerRound
+                   × number of selected rounds × the 1–10 min recording range) ── */}
+              <div className="form-section">
+                <label className="form-label">Estimated Time & Storage</label>
+                <div className="estimate-card">
+                  <div className="estimate-row">
+                    <span className="estimate-label">Total spoken questions</span>
+                    <span className="estimate-val">
+                      {formData.questionsPerRound} × {selectedRounds.length || 1} round{(selectedRounds.length || 1) > 1 ? "s" : ""} = {totals.totalQuestions}
+                    </span>
+                  </div>
+                  <div className="estimate-row">
+                    <span className="estimate-label">Interview duration</span>
+                    <span className="estimate-val">
+                      {formatMinutes(totals.minMinutes)} – {formatMinutes(totals.maxMinutes)}
+                    </span>
+                  </div>
+                  <div className="estimate-row">
+                    <span className="estimate-label">Recording storage (approx.)</span>
+                    <span className="estimate-val">
+                      {formatStorage(totals.minStorageMB)} – {formatStorage(totals.maxStorageMB)}
+                    </span>
+                  </div>
+                </div>
+                <p className="form-hint">
+                  Storage is a rough estimate based on typical webcam recording size — actual size depends on your camera, lighting, and how much you move. If you switch any questions to coding mode during the interview, both numbers will come in lower than shown here.
+                </p>
               </div>
 
               {/* ── Camera & Mic permission checkbox ── */}

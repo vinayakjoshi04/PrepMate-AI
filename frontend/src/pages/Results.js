@@ -27,7 +27,7 @@ export default function Results() {
     setLoading(false);
   }, [navigate]);
 
-  const buildAnalysis = (data) => {
+    const buildAnalysis = (data) => {
     const answers = data.answers || [];
     if (!answers.length) return;
     const executiveSummary = data.executiveSummary || null;
@@ -36,7 +36,11 @@ export default function Results() {
       const r = answer.report || null;
       const skipped = !!answer.skipped;
       const isCoding = !!answer.isCoding;
-      const hasMultimodal = !isCoding && !skipped && !!(r?.videoMetrics || r?.audioMetrics);
+      // FIX: was `!isCoding && !skipped && ...` — that discarded video/audio
+      // analysis for coding questions even when a recording existed and was
+      // analyzed. Now hasMultimodal reflects whether analysis data actually
+      // came back, regardless of question type.
+      const hasMultimodal = !skipped && !!(r?.videoMetrics || r?.audioMetrics);
 
       return {
         questionId:     answer.questionId,

@@ -1,4 +1,3 @@
-// frontend/src/pages/Interview.js
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { analyzeInterviewBatch } from "../services/interviewApi";
@@ -39,7 +38,10 @@ export default function Interview() {
   const [mediaStatus, setMediaStatus] = useState("idle");
   const [mediaError, setMediaError] = useState("");
   const [recordSeconds, setRecordSeconds] = useState(0);
-  const MIN_RECORD_SECONDS = 3;
+  // Recording length bounds: at least 30 seconds of speaking, capped at 10
+  // minutes so a single answer can't run away and blow up upload/analysis time.
+  const MIN_RECORD_SECONDS = 30;
+  const MAX_RECORD_SECONDS = 600;
 
   const liveVideoRef = useRef(null);
   const streamRef = useRef(null);
@@ -52,9 +54,15 @@ export default function Interview() {
   const [codeLang, setCodeLang] = useState("javascript");
   const codeBoxRef = useRef(null);
 
+  // Tracks whether a clip has been saved for the CURRENT question.
+  // Recording is mandatory (Start Recording or Skip — nothing else) for
+  // every non-skipped question, coding or spoken. For coding questions this
+  // gates the "Submit Code" button; for spoken questions the recording flow
+  // itself is what produces the answer.
+  const [clipRecorded, setClipRecorded] = useState(false);
+
   const [finalizing, setFinalizing] = useState(false);
 
-  // Logged-in Supabase user id (or null if not logged in / not using auth here)
   const [userId, setUserId] = useState(null);
 
   useEffect(() => {
@@ -70,7 +78,6 @@ export default function Interview() {
     setInterviewData(data);
     setLoading(false);
 
-    // Fetch the current logged-in user (if any) so recordings can be tied to their account
     supabase.auth
       .getUser()
       .then(({ data: { user } }) => {
@@ -105,7 +112,7 @@ export default function Interview() {
       .catch((err) => {
         console.error("Camera/mic error:", err);
         setMediaError(
-          "Couldn't access your camera/microphone. Spoken questions need it — coding questions still work without it."
+          "Couldn't access your camera/microphone. Every question needs it — you can Start Recording or Skip."
         );
         setMediaStatus("error");
       });
@@ -134,6 +141,13 @@ export default function Interview() {
     setCode("");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentQuestionIndex, currentRound]);
+
+  // Keep clipRecorded in sync with whatever's actually in mediaStore
+  // whenever the current question changes (covers re-visits, round changes, etc).
+  useEffect(() => {
+    const qid = interviewData?.rounds?.[currentRound]?.questions?.[currentQuestionIndex]?.id;
+    setClipRecorded(qid != null && mediaStore.all().has(qid));
+  }, [currentQuestionIndex, currentRound, interviewData]);
 
   useEffect(() => {
     if (loading || !interviewData) return;
@@ -195,32 +209,7 @@ export default function Interview() {
       : "Use a real story from your experience. Quantify results.";
   };
 
-  const startRecording = useCallback(() => {
-    if (!streamRef.current) return;
-    try {
-      chunksRef.current = [];
-      const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus")
-        ? "video/webm;codecs=vp9,opus"
-        : "video/webm";
-      const recorder = new MediaRecorder(streamRef.current, { mimeType });
-      recorder.ondataavailable = (e) => {
-        if (e.data && e.data.size > 0) chunksRef.current.push(e.data);
-      };
-      recorder.onerror = (e) => {
-        console.error("MediaRecorder error:", e);
-        setMediaError("Recording hit an error — please try again.");
-        setMediaStatus("ready");
-      };
-      recorder.start();
-      recorderRef.current = recorder;
-      setMediaStatus("recording");
-      setRecordSeconds(0);
-      recordTimerRef.current = setInterval(() => setRecordSeconds((p) => p + 1), 1000);
-    } catch (err) {
-      console.error("Failed to start recording:", err);
-      setMediaError("Recording failed to start. Please try again.");
-    }
-  }, []);
+  // ── Recording control ───────────────────────────────────────────────────
 
   const stopRecordingAndGetBlob = useCallback(() => {
     return new Promise((resolve) => {
@@ -261,6 +250,12 @@ export default function Interview() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentQuestionIndex, currentRoundData]);
 
+  // Handles BOTH spoken and coding recordings.
+  // - Spoken: saves the clip, creates the placeholder answer, and advances
+  //   to the next question.
+  // - Coding: saves the clip only. It does NOT advance — the person still
+  //   needs to write and submit their code. They can re-record ("Re-record")
+  //   as many times as they want before submitting.
   const handleStopAndSubmit = useCallback(async () => {
     if (recordSeconds < MIN_RECORD_SECONDS) return;
 
@@ -277,11 +272,23 @@ export default function Interview() {
     }
 
     mediaStore.set(currentQuestion.id, blob);
+    setClipRecorded(true);
     console.log(
       "✅ DEBUG: Stored clip for questionId:", currentQuestion.id,
       "(type:", typeof currentQuestion.id, ") size:", blob.size,
-      "bytes, mimeType:", blob.type
+      "bytes, mimeType:", blob.type, "isCoding:", isCoding
     );
+
+    setRecordSeconds(0);
+    setMediaStatus("ready");
+
+    if (isCoding) {
+      // Coding mode: clip saved, but don't advance — person still has to
+      // write & submit their solution. Restart the question timer since we
+      // cleared it above.
+      questionTimerRef.current = setInterval(() => setTimeSpent((p) => p + 1), 1000);
+      return;
+    }
 
     const newAnswer = {
       questionId: currentQuestion.id,
@@ -300,13 +307,61 @@ export default function Interview() {
     setAnswers(updatedAnswers);
     setConfidence(3);
     setShowHint(false);
-    setRecordSeconds(0);
-    setMediaStatus("ready");
     advanceQuestion(updatedAnswers);
   }, [
     recordSeconds, currentQuestion, currentRound, currentRoundData, confidence,
-    timeSpent, answers, stopRecordingAndGetBlob, advanceQuestion,
+    timeSpent, answers, isCoding, stopRecordingAndGetBlob, advanceQuestion,
   ]);
+
+  // ── FIX: keep a ref pointing at the LATEST handleStopAndSubmit ─────────
+  // startRecording (below) is created once via useCallback([]) and its
+  // setInterval closure would otherwise capture whatever handleStopAndSubmit
+  // looked like at that moment — a stale copy with outdated recordSeconds/
+  // answers baked in. This ref is updated on every render, so anything that
+  // calls handleStopAndSubmitRef.current() always invokes the current,
+  // up-to-date version instead of a frozen one from page load.
+  const handleStopAndSubmitRef = useRef();
+  useEffect(() => {
+    handleStopAndSubmitRef.current = handleStopAndSubmit;
+  }, [handleStopAndSubmit]);
+
+  const startRecording = useCallback(() => {
+    if (!streamRef.current) return;
+    try {
+      chunksRef.current = [];
+      const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus")
+        ? "video/webm;codecs=vp9,opus"
+        : "video/webm";
+      const recorder = new MediaRecorder(streamRef.current, { mimeType });
+      recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) chunksRef.current.push(e.data);
+      };
+      recorder.onerror = (e) => {
+        console.error("MediaRecorder error:", e);
+        setMediaError("Recording hit an error — please try again.");
+        setMediaStatus("ready");
+      };
+      recorder.start();
+      recorderRef.current = recorder;
+      setMediaStatus("recording");
+      setRecordSeconds(0);
+      recordTimerRef.current = setInterval(() => {
+        setRecordSeconds((p) => {
+          const next = p + 1;
+          // Auto-stop & submit once we hit the 10-minute cap. Uses the ref
+          // so it always calls the freshest handleStopAndSubmit, not a
+          // stale one captured when startRecording was first created.
+          if (next >= MAX_RECORD_SECONDS) {
+            handleStopAndSubmitRef.current?.();
+          }
+          return next;
+        });
+      }, 1000);
+    } catch (err) {
+      console.error("Failed to start recording:", err);
+      setMediaError("Recording failed to start. Please try again.");
+    }
+  }, []);
 
   const handleCodeKeyDown = (e) => {
     if (e.key === "Tab") {
@@ -340,7 +395,12 @@ export default function Interview() {
     }
   };
 
+  // Requires a saved clip (clipRecorded) before allowing submit.
   const handleSubmitCode = useCallback(() => {
+    if (!clipRecorded) {
+      setMediaError("Please record yourself talking through your approach before submitting.");
+      return;
+    }
     if (!code.trim()) {
       codeBoxRef.current?.focus();
       codeBoxRef.current?.classList.add("shake");
@@ -367,7 +427,7 @@ export default function Interview() {
     setConfidence(3);
     setShowHint(false);
     advanceQuestion(updatedAnswers);
-  }, [code, codeLang, currentQuestion, currentRound, currentRoundData, confidence, timeSpent, answers, advanceQuestion]);
+  }, [clipRecorded, code, codeLang, currentQuestion, currentRound, currentRoundData, confidence, timeSpent, answers, advanceQuestion]);
 
   const completeRound = (allAnswers) => {
     if (currentRound < interviewData.rounds.length - 1) {
@@ -386,9 +446,13 @@ export default function Interview() {
     setNextRoundData(null);
   };
 
-  // ── ONE consolidated analysis call for the whole interview ─────────────
   const finishInterview = async (allAnswers) => {
     setFinalizing(true);
+
+    // hasRecordedClip is derived from what's ACTUALLY in mediaStore, not
+    // from isCoding — so coding questions that were recorded now carry
+    // that fact through to the backend instead of being silently dropped.
+    const clipIds = new Set([...mediaStore.all().keys()].map(String));
 
     const items = allAnswers.map((a) => ({
       questionId: a.questionId,
@@ -397,6 +461,7 @@ export default function Interview() {
       round: a.round,
       skipped: !!a.skipped,
       isCoding: !!a.isCoding,
+      hasRecordedClip: clipIds.has(String(a.questionId)),
     }));
 
     console.log("🔍 DEBUG allAnswers:", allAnswers);
@@ -519,7 +584,7 @@ export default function Interview() {
         </div>
       )}
 
-      {mediaStatus === "error" && !isCoding && (
+      {mediaStatus === "error" && (
         <div className="modal-overlay">
           <div className="modal-card">
             <div className="modal-icon">📵</div>
@@ -586,6 +651,7 @@ export default function Interview() {
                 </span>
                 <span className="focus-badge">{currentQuestion.focusArea || "General"}</span>
                 {isCoding && <span className="coding-badge">Coding</span>}
+                {clipRecorded && <span className="q-mm-badge">Recorded</span>}
               </div>
               <div className="question-meta-right">
                 <button
@@ -617,7 +683,6 @@ export default function Interview() {
             )}
           </div>
 
-          {/* ── Workspace: camera + (optionally) code editor side by side ── */}
           <div className={`workspace-grid ${isCoding ? "split-mode" : ""}`}>
 
             <div className={`camera-stage ${isCoding ? "compact" : ""}`}>
@@ -625,60 +690,63 @@ export default function Interview() {
                 <video ref={liveVideoRef} autoPlay muted playsInline className="camera-video mirrored" />
                 {mediaStatus === "recording" && (
                   <div className="rec-overlay">
-                    <span className="rec-indicator"><span className="rec-dot" /> REC {formatTime(recordSeconds)}</span>
+                    <span className="rec-indicator">
+                      <span className="rec-dot" /> REC {formatTime(recordSeconds)} / {formatTime(MAX_RECORD_SECONDS)}
+                    </span>
                   </div>
                 )}
                 {mediaStatus === "requesting" && <div className="camera-overlay-msg">Connecting to camera…</div>}
                 {mediaStatus === "processing" && <div className="camera-overlay-msg">Finalizing clip…</div>}
-                {isCoding && mediaStatus === "ready" && (
-                  <div className="camera-corner-label">Talk through your approach on camera</div>
+              </div>
+
+              {/* Unified controls — Start Recording / Stop & Save / Skip.
+                  Shown for EVERY question, coding or spoken. */}
+              <div className="camera-controls">
+                {mediaStatus === "ready" && (
+                  <button className="btn-record" onClick={startRecording}>
+                    {clipRecorded ? "Re-record" : "Start Recording"}
+                  </button>
+                )}
+                {mediaStatus === "recording" && (
+                  <>
+                    <button
+                      className="btn-stop-submit"
+                      onClick={handleStopAndSubmit}
+                      disabled={recordSeconds < MIN_RECORD_SECONDS}
+                    >
+                      {recordSeconds < MIN_RECORD_SECONDS
+                        ? `Keep speaking… (${MIN_RECORD_SECONDS - recordSeconds}s min)`
+                        : recordSeconds >= MAX_RECORD_SECONDS - 10
+                        ? "Stopping soon — Save"
+                        : isCoding ? "Stop & Save Recording" : "Stop & Save Answer"}
+                    </button>
+                    <button className="btn-cancel-rec" onClick={cancelRecording}>Cancel & Re-record</button>
+                  </>
+                )}
+                {mediaStatus === "processing" && (
+                  <button className="btn-record" disabled>Working…</button>
                 )}
               </div>
 
-              {!isCoding && (
-                <>
-                  <div className="camera-controls">
-                    {mediaStatus === "ready" && (
-                      <button className="btn-record" onClick={startRecording}>Start Recording</button>
-                    )}
-                    {mediaStatus === "recording" && (
-                      <>
-                        <button
-                          className="btn-stop-submit"
-                          onClick={handleStopAndSubmit}
-                          disabled={recordSeconds < MIN_RECORD_SECONDS}
-                        >
-                          {recordSeconds < MIN_RECORD_SECONDS
-                            ? `Keep speaking… (${MIN_RECORD_SECONDS - recordSeconds}s)`
-                            : "Stop & Save Answer"}
-                        </button>
-                        <button className="btn-cancel-rec" onClick={cancelRecording}>Cancel & Re-record</button>
-                      </>
-                    )}
-                    {mediaStatus === "processing" && (
-                      <button className="btn-record" disabled>Working…</button>
-                    )}
-                  </div>
+              <p className="camera-hint">
+                {isCoding
+                  ? (clipRecorded
+                      ? "Recording saved. Write your solution below, then Submit Code."
+                      : "Record yourself talking through your approach (at least 30 seconds) — this is required before you can submit code.")
+                  : (mediaStatus === "ready"
+                      ? "Speak your answer out loud (at least 30 seconds). Analysis runs once, after you finish all questions — so no waiting between answers."
+                      : mediaStatus === "recording"
+                      ? "Face the camera, speak clearly — we're tracking eye contact, posture, pace, and filler words. Recording auto-stops at 10 minutes."
+                      : mediaStatus === "processing"
+                      ? "Wrapping up the recording…"
+                      : "")}
+              </p>
 
-                  <p className="camera-hint">
-                    {mediaStatus === "ready" && "Speak your answer out loud. Analysis runs once, after you finish all questions — so no waiting between answers."}
-                    {mediaStatus === "recording" && "Face the camera, speak clearly — we're tracking eye contact, posture, pace, and filler words."}
-                    {mediaStatus === "processing" && "Wrapping up the recording…"}
-                  </p>
-
-                  <div className="action-buttons">
-                    <button className="btn-skip" onClick={handleSkipQuestion} disabled={mediaStatus === "processing"}>
-                      Skip
-                    </button>
-                  </div>
-                </>
-              )}
-
-              {isCoding && (
-                <p className="camera-hint compact-hint">
-                  Camera stays on for observation only — no recording is required for coding questions.
-                </p>
-              )}
+              <div className="action-buttons">
+                <button className="btn-skip" onClick={handleSkipQuestion} disabled={mediaStatus === "processing"}>
+                  Skip
+                </button>
+              </div>
             </div>
 
             {isCoding && (
@@ -719,7 +787,12 @@ export default function Interview() {
 
                 <div className="code-editor-actions">
                   <button className="btn-skip" onClick={handleSkipQuestion}>Skip</button>
-                  <button className="btn-submit-code" onClick={handleSubmitCode} disabled={!code.trim()}>
+                  <button
+                    className="btn-submit-code"
+                    onClick={handleSubmitCode}
+                    disabled={!code.trim() || !clipRecorded}
+                    title={!clipRecorded ? "Record yourself first" : undefined}
+                  >
                     Submit Code →
                   </button>
                 </div>
