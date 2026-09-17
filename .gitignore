@@ -42,5 +42,4 @@ Thumbs.db
 .vscode/
 .idea/
 
-backend/uploads/media/
-backend/uploads/recordings/
+backend/uploads/

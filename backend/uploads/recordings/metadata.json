@@ -48,5 +48,35 @@
     "experienceLevel": "Entry Level",
     "durationSec": 54.4,
     "savedAt": 1789534916.711054
+  },
+  {
+    "sessionId": "interview_1789537857549",
+    "questionId": "2",
+    "storagePath": "interview_1789537857549/2_tmpcftme3g1.webm",
+    "userId": "9d21286a-6e11-4acf-8e1a-c34d8f6002cf",
+    "jobTitle": "SDE Intern",
+    "experienceLevel": "Entry Level",
+    "durationSec": 55.6,
+    "savedAt": 1789538002.1592128
+  },
+  {
+    "sessionId": "interview_1789538186524",
+    "questionId": "1",
+    "storagePath": "interview_1789538186524/1_tmpy812ksk3.webm",
+    "userId": "9d21286a-6e11-4acf-8e1a-c34d8f6002cf",
+    "jobTitle": "SDE Intern",
+    "experienceLevel": "Entry Level",
+    "durationSec": 31.6,
+    "savedAt": 1789538276.938859
+  },
+  {
+    "sessionId": "interview_1789541246515",
+    "questionId": "2",
+    "storagePath": "interview_1789541246515/2_tmp9ug5nnxt.webm",
+    "userId": "9d21286a-6e11-4acf-8e1a-c34d8f6002cf",
+    "jobTitle": "SDE Engineer",
+    "experienceLevel": "Entry Level",
+    "durationSec": 30.9,
+    "savedAt": 1789541304.3943026
   }
 ]

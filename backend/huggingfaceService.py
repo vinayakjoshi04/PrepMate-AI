@@ -2,6 +2,14 @@
 # Hugging Face Inference API wrapper.
 #
 # CHANGELOG (this revision):
+#   - DEBUG: added a one-line print right after HF_API_KEY is loaded, showing
+#     the last 6 characters of the key actually in use. Compare this against
+#     the last 6 characters of your new token on huggingface.co/settings/tokens
+#     to confirm the new key is really being picked up (and not a stale env
+#     var or an old line still sitting in .env). Remove this print once
+#     confirmed.
+#
+# CHANGELOG (earlier revision):
 #   - FIX: call_huggingface() now takes an `expect_json` flag (default True).
 #     Previously EVERY call — including plain-text calls like the ATS resume
 #     rewrite and the executive summary — used the same hard-coded system
@@ -16,15 +24,15 @@
 #         and just strips stray ``` fences before returning.
 #   - generate_executive_summary() and resumeanalyzer.generate_ats_resume()
 #     now call this with expect_json=False so they never get JSON-wrapped.
-#
-# CHANGELOG (earlier revision):
 #   - Added generate_executive_summary() for a panel-style report summary.
 #   - QWEN_MODEL ("Qwen/Qwen2.5-7B-Instruct") is no longer usable on HF's
-#     free serverless tier — HF's router now points it at a Together AI
-#     "Turbo" variant that requires a paid dedicated endpoint, and every
-#     call fails instantly with a 400 "model_not_available" error. Both
-#     generate_behavioral_report() and generate_batch_behavioral_report()
-#     now use LLAMA_MODEL instead, which is confirmed working.
+#     free serverless tier for free — it also depletes the same account-level
+#     credit pool as LLAMA_MODEL (confirmed: both route through different
+#     providers — novita for Llama, featherless-ai for Qwen — but both hit
+#     402 "depleted monthly credits" once the HF ACCOUNT is out of credit).
+#     Switching models does NOT reset or bypass this; the quota is per HF
+#     account, not per model or per token. ACTIVE_MODEL is kept as LLAMA_MODEL
+#     per user preference.
 #   - call_huggingface() retry logic reworked:
 #       * Fails FAST (no retries wasted) when the model route is
 #         permanently dead (400 "model_not_available"/"non-serverless"),
@@ -34,6 +42,13 @@
 #         a cold model genuinely needs that time, it's not a dead route.
 #       * Default retry_count raised 3 -> 5 to give real cold-starts a
 #         fair chance before falling back.
+#       * NOTE: 402 Payment Required (depleted credits) is NOT currently
+#         special-cased below — it falls through to the generic "anything
+#         else" branch and gets retried with a flat backoff even though
+#         retrying a 402 is pointless (it will never succeed until the
+#         account has credit). Worth adding a fail-fast branch for "402"/
+#         "Payment Required" the same way "model_not_available" is handled,
+#         so you don't burn 5 retries every time you're just out of credit.
 #
 # One model is used for everything now:
 #   - LLAMA_MODEL: text scoring for individual/batch answers AND the
@@ -56,15 +71,24 @@ except ImportError:
     subprocess.check_call(["pip", "install", "huggingface_hub"])
     from huggingface_hub import InferenceClient
 
-load_dotenv()
+load_dotenv(override=True)
 
 HF_API_KEY = os.getenv("HF_API_KEY")
 
-LLAMA_MODEL = "meta-llama/Llama-3.1-8B-Instruct"
-# NOTE: QWEN_MODEL kept only for reference / in case HF restores free access
-# to it later. Do NOT pass this to call_huggingface() right now — it will
-# fail every single attempt with a 400 model_not_available error.
+# --- DEBUG: confirm which key is actually loaded ---
+# Compare this suffix against the last 6 chars of your new token shown on
+# https://huggingface.co/settings/tokens (for the account you expect to be
+# using). If it matches the OLD key's suffix, .env isn't being read correctly
+# or a stale terminal/system env var is winning. Remove this once confirmed.
+print(f"🔑 Using HF key ending in: ...{HF_API_KEY[-6:] if HF_API_KEY else 'MISSING'}")
+
+LLAMA_MODEL = "meta-llama/Meta-Llama-3.1-8B-Instruct"
+# NOTE: QWEN_MODEL kept only for reference. Switching to it does NOT help
+# with a depleted-credits (402) error — that quota is per HF account, not
+# per model. Only use this if you specifically want to test Qwen's output
+# quality on an account that still has credit.
 QWEN_MODEL = "Qwen/Qwen2.5-7B-Instruct"
+ACTIVE_MODEL = LLAMA_MODEL
 
 RATE_LIMIT_DELAY = 3
 last_request_time = 0
@@ -140,7 +164,7 @@ def extract_json_from_text(text):
 def call_huggingface(prompt, max_tokens=3072, retry_count=5, model=None, system_prompt=None,
                       expect_json=True):
     """Make a request to Hugging Face using InferenceClient with retry logic.
-    `model` defaults to LLAMA_MODEL.
+    `model` defaults to ACTIVE_MODEL (currently LLAMA_MODEL).
 
     `expect_json` (default True) controls two things:
       - Which default system prompt is used when `system_prompt` isn't passed
@@ -154,6 +178,11 @@ def call_huggingface(prompt, max_tokens=3072, retry_count=5, model=None, system_
       - "model_not_available" / "non-serverless" (dead route, needs a paid
         dedicated endpoint) -> fails IMMEDIATELY, no retries. Retrying this
         error is pointless; it will fail identically every time.
+      - "402" / "Payment Required" (HF account has depleted its monthly
+        included credits) -> fails IMMEDIATELY, no retries. Retrying this
+        is pointless too — it will keep failing until the account has
+        credit, regardless of model. This mirrors the model_not_available
+        fail-fast handling above.
       - "503"/"loading" (model cold-starting) -> retries with an increasing
         wait (15s, 30s, 45s, ...) since this genuinely just needs more time.
       - rate limit / 429 -> retries with increasing backoff.
@@ -162,7 +191,7 @@ def call_huggingface(prompt, max_tokens=3072, retry_count=5, model=None, system_
     rate_limit()
 
     hf_client = get_client()
-    model_to_use = model or LLAMA_MODEL
+    model_to_use = model or ACTIVE_MODEL
 
     default_system_prompt = DEFAULT_JSON_SYSTEM_PROMPT if expect_json else DEFAULT_PLAIN_TEXT_SYSTEM_PROMPT
 
@@ -222,6 +251,15 @@ def call_huggingface(prompt, max_tokens=3072, retry_count=5, model=None, system_
                     f"Model '{model_to_use}' is not available on HF's free serverless "
                     f"tier right now (needs a paid dedicated endpoint). Switch to a "
                     f"different model. Original error: {error_msg}"
+                )
+
+            if "402" in error_msg or "payment required" in error_msg.lower() or "depleted" in error_msg.lower():
+                raise Exception(
+                    f"HF account for the current key has depleted its monthly included "
+                    f"credits (402 Payment Required). Switching models will NOT fix this — "
+                    f"the credit pool is per HF account, not per model. Use a different HF "
+                    f"account with available credit, buy pre-paid credits, or switch to a "
+                    f"different inference provider. Original error: {error_msg}"
                 )
 
             if "503" in error_msg or "loading" in error_msg.lower():
@@ -352,7 +390,7 @@ CRITICAL RULES:
 def generate_behavioral_report(question, answer_text, job_title, experience_level,
                                 video_metrics=None, audio_metrics=None):
     """
-    Uses LLAMA_MODEL to synthesize verbal (answer content) + non-verbal (video)
+    Uses ACTIVE_MODEL to synthesize verbal (answer content) + non-verbal (video)
     + vocal-delivery (audio) signals into one combined feedback report.
     video_metrics / audio_metrics may be None or contain an 'error' key if that
     modality wasn't available — the prompt is built to degrade gracefully.
@@ -438,7 +476,7 @@ Return ONLY valid JSON (no markdown):
 Rules: all scores 0-10 integers, arrays 2-3 items, return ONLY JSON."""
 
     response_text = call_huggingface(
-        prompt, max_tokens=900, model=LLAMA_MODEL,
+        prompt, max_tokens=900, model=ACTIVE_MODEL,
         system_prompt=(
             "You are an expert interview coach that fuses verbal content with body "
             "language and vocal delivery data into one JSON report. Respond with ONLY "
@@ -572,7 +610,7 @@ Rules: one entry per answer in order given, index matches the bracketed number a
 all scores 0-10 integers, arrays 2-3 items, return ONLY JSON."""
 
     response_text = call_huggingface(
-        prompt, max_tokens=min(300 + len(items) * 220, 3000), model=LLAMA_MODEL,
+        prompt, max_tokens=min(300 + len(items) * 220, 3000), model=ACTIVE_MODEL,
         system_prompt=(
             "You are an expert interview coach that scores multiple answers — spoken and coding — "
             "in one pass, fusing content with body language and vocal delivery data where available. "
@@ -618,7 +656,7 @@ no markdown, no quotes around it."""
 
     try:
         text = call_huggingface(
-            prompt, max_tokens=220, model=LLAMA_MODEL,
+            prompt, max_tokens=220, model=ACTIVE_MODEL,
             expect_json=False,
             system_prompt=(
                 "You are a senior hiring panel member. Write plain, direct prose only — "
