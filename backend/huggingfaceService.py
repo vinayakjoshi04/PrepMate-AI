@@ -1,99 +1,55 @@
 # backend/huggingfaceService.py
-# Hugging Face Inference API wrapper.
+# LLM wrapper. Function names are unchanged (call_huggingface etc.) so
+# interview.py, resumeanalyzer.py and app.py keep working without edits.
 #
 # CHANGELOG (this revision):
-#   - DEBUG: added a one-line print right after HF_API_KEY is loaded, showing
-#     the last 6 characters of the key actually in use. Compare this against
-#     the last 6 characters of your new token on huggingface.co/settings/tokens
-#     to confirm the new key is really being picked up (and not a stale env
-#     var or an old line still sitting in .env). Remove this print once
-#     confirmed.
+#   - Transport is Groq's free tier (OpenAI-compatible API). Whisper is
+#     unaffected: it runs locally.
+#   - Default model is now openai/gpt-oss-20b (Groq no longer lists Llama chat
+#     models for this key). gpt-oss models are REASONING models: they spend
+#     part of the token budget thinking before they answer. To avoid empty or
+#     truncated replies this file:
+#       * sends reasoning_effort="low" for gpt-oss models,
+#       * adds REASONING_HEADROOM extra tokens to every request,
+#       * treats an empty reply as a failed attempt and retries.
+#   - JSON mode (response_format=json_object) is tried first for JSON calls;
+#     if Groq rejects it for the model, the call is retried once without it
+#     (the JSON-extraction/validation code below still handles the output).
+#   - Temperature is a parameter. Default: 0.3 for JSON calls, 0.7 for plain text.
 #
-# CHANGELOG (earlier revision):
-#   - FIX: call_huggingface() now takes an `expect_json` flag (default True).
-#     Previously EVERY call — including plain-text calls like the ATS resume
-#     rewrite and the executive summary — used the same hard-coded system
-#     prompt: "You MUST respond with ONLY valid, complete JSON." That directly
-#     contradicted user prompts that asked for plain resume text, so the model
-#     would wrap the resume in a JSON object (e.g. {"resume": "..."}), which is
-#     exactly the "downloaded doc is JSON" bug. Now:
-#       * expect_json=True  (default, used by all scoring/report/JSON calls):
-#         unchanged behavior — forces JSON, validates/retries on bad JSON.
-#       * expect_json=False (used by plain-text calls): uses a plain-text
-#         system prompt instead, skips the JSON validate/retry loop entirely,
-#         and just strips stray ``` fences before returning.
-#   - generate_executive_summary() and resumeanalyzer.generate_ats_resume()
-#     now call this with expect_json=False so they never get JSON-wrapped.
-#   - Added generate_executive_summary() for a panel-style report summary.
-#   - QWEN_MODEL ("Qwen/Qwen2.5-7B-Instruct") is no longer usable on HF's
-#     free serverless tier for free — it also depletes the same account-level
-#     credit pool as LLAMA_MODEL (confirmed: both route through different
-#     providers — novita for Llama, featherless-ai for Qwen — but both hit
-#     402 "depleted monthly credits" once the HF ACCOUNT is out of credit).
-#     Switching models does NOT reset or bypass this; the quota is per HF
-#     account, not per model or per token. ACTIVE_MODEL is kept as LLAMA_MODEL
-#     per user preference.
-#   - call_huggingface() retry logic reworked:
-#       * Fails FAST (no retries wasted) when the model route is
-#         permanently dead (400 "model_not_available"/"non-serverless"),
-#         since retrying that error 3x just burns time for nothing.
-#       * Waits LONGER and scales up per attempt on genuine 503/loading
-#         cold-starts (15s, 30s, 45s...) instead of giving up quickly —
-#         a cold model genuinely needs that time, it's not a dead route.
-#       * Default retry_count raised 3 -> 5 to give real cold-starts a
-#         fair chance before falling back.
-#       * NOTE: 402 Payment Required (depleted credits) is NOT currently
-#         special-cased below — it falls through to the generic "anything
-#         else" branch and gets retried with a flat backoff even though
-#         retrying a 402 is pointless (it will never succeed until the
-#         account has credit). Worth adding a fail-fast branch for "402"/
-#         "Payment Required" the same way "model_not_available" is handled,
-#         so you don't burn 5 retries every time you're just out of credit.
+# .env needs:
+#   GROQ_API_KEY=gsk_...
+# Optional:
+#   GROQ_MODEL=openai/gpt-oss-20b     (or openai/gpt-oss-120b for higher quality)
 #
-# One model is used for everything now:
-#   - LLAMA_MODEL: text scoring for individual/batch answers AND the
-#     multimodal/behavioral report (previously split across two models;
-#     consolidated after QWEN_MODEL stopped being accessible for free).
-#
-# Get your free API key: https://huggingface.co/settings/tokens
+# To list the models your key can use:
+#   python -c "import os,requests; from dotenv import load_dotenv; load_dotenv(); r=requests.get('https://api.groq.com/openai/v1/models', headers={'Authorization':'Bearer '+os.getenv('GROQ_API_KEY')}); [print(m['id']) for m in r.json()['data']]"
 
 import os
-from dotenv import load_dotenv
 import time
 import json
 import re
 
-try:
-    from huggingface_hub import InferenceClient
-except ImportError:
-    print("Installing huggingface_hub...")
-    import subprocess
-    subprocess.check_call(["pip", "install", "huggingface_hub"])
-    from huggingface_hub import InferenceClient
+import requests
+from dotenv import load_dotenv
 
 load_dotenv(override=True)
 
-HF_API_KEY = os.getenv("HF_API_KEY")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-20b")
+GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 
-# --- DEBUG: confirm which key is actually loaded ---
-# Compare this suffix against the last 6 chars of your new token shown on
-# https://huggingface.co/settings/tokens (for the account you expect to be
-# using). If it matches the OLD key's suffix, .env isn't being read correctly
-# or a stale terminal/system env var is winning. Remove this once confirmed.
-print(f"🔑 Using HF key ending in: ...{HF_API_KEY[-6:] if HF_API_KEY else 'MISSING'}")
+# Extra tokens added on top of max_tokens for reasoning models, so the model's
+# internal thinking doesn't eat the budget meant for the actual answer.
+REASONING_HEADROOM = 600
 
-LLAMA_MODEL = "meta-llama/Meta-Llama-3.1-8B-Instruct"
-# NOTE: QWEN_MODEL kept only for reference. Switching to it does NOT help
-# with a depleted-credits (402) error — that quota is per HF account, not
-# per model. Only use this if you specifically want to test Qwen's output
-# quality on an account that still has credit.
-QWEN_MODEL = "Qwen/Qwen2.5-7B-Instruct"
-ACTIVE_MODEL = LLAMA_MODEL
+print(f"🔑 Using Groq key ending in: ...{GROQ_API_KEY[-6:] if GROQ_API_KEY else 'MISSING'}")
+print(f"🤖 Active model: {GROQ_MODEL}")
 
-RATE_LIMIT_DELAY = 3
+ACTIVE_MODEL = GROQ_MODEL
+
+RATE_LIMIT_DELAY = 2
 last_request_time = 0
-
-client = None
 
 DEFAULT_JSON_SYSTEM_PROMPT = (
     "You are an expert technical recruiter and interviewer. You MUST "
@@ -108,18 +64,6 @@ DEFAULT_PLAIN_TEXT_SYSTEM_PROMPT = (
     "fences, and do not add any preamble, explanation, or commentary beyond "
     "exactly what was asked for."
 )
-
-
-def get_client():
-    global client
-    if client is None:
-        if not HF_API_KEY:
-            raise Exception(
-                "Hugging Face API key missing in .env file. "
-                "Get your free key at: https://huggingface.co/settings/tokens"
-            )
-        client = InferenceClient(token=HF_API_KEY)
-    return client
 
 
 def rate_limit():
@@ -161,47 +105,86 @@ def extract_json_from_text(text):
     return text
 
 
+def _is_reasoning_model(model):
+    return "gpt-oss" in (model or "").lower()
+
+
+def groq_chat(messages, model, max_tokens, temperature=0.3, stop=None, json_mode=False):
+    """Single call to Groq's OpenAI-compatible chat endpoint. Returns the text."""
+    if not GROQ_API_KEY:
+        raise Exception(
+            "GROQ_API_KEY is missing from .env. "
+            "Get a free key at: https://console.groq.com/keys"
+        )
+
+    reasoning = _is_reasoning_model(model)
+
+    payload = {
+        "model": model,
+        "messages": messages,
+        "max_tokens": max_tokens + (REASONING_HEADROOM if reasoning else 0),
+        "temperature": temperature,
+    }
+    if reasoning:
+        payload["reasoning_effort"] = "low"
+    if stop:
+        payload["stop"] = stop
+    if json_mode:
+        payload["response_format"] = {"type": "json_object"}
+
+    def _post(body):
+        return requests.post(
+            GROQ_URL,
+            headers={"Authorization": f"Bearer {GROQ_API_KEY}"},
+            json=body,
+            timeout=90,
+        )
+
+    r = _post(payload)
+
+    # If this model rejects JSON mode, retry once without it. The validation
+    # and extraction logic in call_huggingface still checks the JSON.
+    if r.status_code == 400 and json_mode:
+        low = r.text.lower()
+        if "response_format" in low or "json" in low:
+            print("⚠️  JSON mode rejected for this model, retrying without it...")
+            payload.pop("response_format", None)
+            r = _post(payload)
+
+    if r.status_code != 200:
+        raise Exception(f"{r.status_code} Groq error: {r.text[:400]}")
+
+    content = r.json()["choices"][0]["message"].get("content") or ""
+    if not content.strip():
+        raise Exception("Empty reply from model (reasoning used the whole token budget)")
+    return content
+
+
 def call_huggingface(prompt, max_tokens=3072, retry_count=5, model=None, system_prompt=None,
-                      expect_json=True):
-    """Make a request to Hugging Face using InferenceClient with retry logic.
-    `model` defaults to ACTIVE_MODEL (currently LLAMA_MODEL).
+                     expect_json=True, temperature=None):
+    """LLM call with retry logic. (Name kept for backward compatibility; it now
+    talks to Groq.)
 
-    `expect_json` (default True) controls two things:
-      - Which default system prompt is used when `system_prompt` isn't passed
-        explicitly (a JSON-forcing prompt vs. a plain-text prompt).
-      - Whether the response is validated/retried as JSON at all. Plain-text
-        calls (like a resume rewrite) should NEVER be forced into JSON, and
-        previously they were — this flag is the fix for that.
-
-    Retry behavior (expect_json=True only; expect_json=False returns on the
-    first successful response with no JSON validation):
-      - "model_not_available" / "non-serverless" (dead route, needs a paid
-        dedicated endpoint) -> fails IMMEDIATELY, no retries. Retrying this
-        error is pointless; it will fail identically every time.
-      - "402" / "Payment Required" (HF account has depleted its monthly
-        included credits) -> fails IMMEDIATELY, no retries. Retrying this
-        is pointless too — it will keep failing until the account has
-        credit, regardless of model. This mirrors the model_not_available
-        fail-fast handling above.
-      - "503"/"loading" (model cold-starting) -> retries with an increasing
-        wait (15s, 30s, 45s, ...) since this genuinely just needs more time.
-      - rate limit / 429 -> retries with increasing backoff.
-      - anything else -> retries with a flat short backoff.
+    expect_json=True  -> JSON system prompt, JSON mode, validate/retry on bad JSON.
+    expect_json=False -> plain-text system prompt, no JSON validation.
+    temperature       -> defaults to 0.3 for JSON calls, 0.7 for plain text.
     """
     rate_limit()
 
-    hf_client = get_client()
     model_to_use = model or ACTIVE_MODEL
+    if temperature is None:
+        temperature = 0.3 if expect_json else 0.7
 
     default_system_prompt = DEFAULT_JSON_SYSTEM_PROMPT if expect_json else DEFAULT_PLAIN_TEXT_SYSTEM_PROMPT
 
     messages = [
-        {
-            "role": "system",
-            "content": system_prompt or default_system_prompt
-        },
-        {"role": "user", "content": prompt}
+        {"role": "system", "content": system_prompt or default_system_prompt},
+        {"role": "user", "content": prompt},
     ]
+
+    # Stop sequences: JSON output must not be cut by "\n\n\n", so only use
+    # them for plain-text calls.
+    stop = None if expect_json else ["```"]
 
     last_error = None
 
@@ -209,20 +192,17 @@ def call_huggingface(prompt, max_tokens=3072, retry_count=5, model=None, system_
         try:
             print(f"🔄 [{model_to_use}] Attempt {attempt + 1}/{retry_count}...")
 
-            response = hf_client.chat_completion(
+            generated_text = groq_chat(
                 messages=messages,
                 model=model_to_use,
                 max_tokens=max_tokens,
-                temperature=0.7,
-                stop=["```", "\n\n\n"]
+                temperature=temperature,
+                stop=stop,
+                json_mode=expect_json,
             )
-
-            generated_text = response.choices[0].message.content
             print(f"📝 Received {len(generated_text)} characters")
 
             if not expect_json:
-                # Plain-text mode: skip JSON validation/retry entirely. Just
-                # strip any stray markdown code-fence the model might still add.
                 cleaned = re.sub(r'```[a-z]*\n?', '', generated_text).strip()
                 print(f"✅ Plain-text response accepted on attempt {attempt + 1}")
                 return cleaned
@@ -238,52 +218,49 @@ def call_huggingface(prompt, max_tokens=3072, retry_count=5, model=None, system_
                     time.sleep(2)
                     last_error = json_err
                     continue
-                else:
-                    return generated_text
+                return generated_text
 
         except Exception as e:
             error_msg = str(e)
             last_error = e
             print(f"❌ Attempt {attempt + 1} failed: {error_msg}")
 
-            if "model_not_available" in error_msg or "non-serverless" in error_msg.lower():
+            low = error_msg.lower()
+
+            # Bad key: retrying is pointless
+            if "401" in error_msg or "invalid api key" in low or "unauthorized" in low:
                 raise Exception(
-                    f"Model '{model_to_use}' is not available on HF's free serverless "
-                    f"tier right now (needs a paid dedicated endpoint). Switch to a "
-                    f"different model. Original error: {error_msg}"
+                    "Invalid Groq API key. Check GROQ_API_KEY in .env "
+                    "(create one at https://console.groq.com/keys)."
                 )
 
-            if "402" in error_msg or "payment required" in error_msg.lower() or "depleted" in error_msg.lower():
+            # Model name wrong / removed: retrying is pointless
+            if "model_not_found" in low or "does not exist" in low or "decommissioned" in low:
                 raise Exception(
-                    f"HF account for the current key has depleted its monthly included "
-                    f"credits (402 Payment Required). Switching models will NOT fix this — "
-                    f"the credit pool is per HF account, not per model. Use a different HF "
-                    f"account with available credit, buy pre-paid credits, or switch to a "
-                    f"different inference provider. Original error: {error_msg}"
+                    f"Model '{model_to_use}' is not available on Groq. "
+                    f"Set GROQ_MODEL in .env to a current model. Original error: {error_msg}"
                 )
 
-            if "503" in error_msg or "loading" in error_msg.lower():
-                wait_time = 15 * (attempt + 1)
-                print(f"⏳ Model is loading, waiting {wait_time} seconds (attempt {attempt + 1})...")
-                time.sleep(wait_time)
-                continue
-            elif "rate limit" in error_msg.lower() or "429" in error_msg:
+            # Rate limit: wait and retry
+            if "429" in error_msg or "rate limit" in low:
                 if attempt < retry_count - 1:
-                    wait_time = 10 * (attempt + 1)
+                    wait_time = 8 * (attempt + 1)
+                    print(f"⏳ Rate limited, waiting {wait_time}s...")
                     time.sleep(wait_time)
                     continue
-                else:
-                    raise Exception("Rate limit exceeded. Wait a moment and try again.")
-            elif "401" in error_msg or "unauthorized" in error_msg.lower():
-                raise Exception(
-                    "Invalid API key. Get your free Hugging Face API key at: "
-                    "https://huggingface.co/settings/tokens"
-                )
-            elif attempt < retry_count - 1:
-                time.sleep(4)
+                raise Exception("Groq rate limit exceeded. Wait a minute and try again.")
+
+            # Temporary server trouble: wait and retry
+            if any(code in error_msg for code in ("500", "502", "503", "504")) or "overloaded" in low:
+                wait_time = 5 * (attempt + 1)
+                print(f"⏳ Groq temporarily unavailable, waiting {wait_time}s...")
+                time.sleep(wait_time)
                 continue
-            else:
-                raise Exception(f"Hugging Face API error after {retry_count} attempts: {error_msg}")
+
+            if attempt < retry_count - 1:
+                time.sleep(3)
+                continue
+            raise Exception(f"LLM API error after {retry_count} attempts: {error_msg}")
 
     if last_error:
         raise last_error
@@ -359,7 +336,8 @@ CRITICAL RULES:
 4. Ensure all braces and brackets are properly closed
 5. No trailing commas"""
 
-    text = call_huggingface(prompt, max_tokens=3072)
+    # Slightly higher temperature here: question variety is a feature.
+    text = call_huggingface(prompt, max_tokens=3072, temperature=0.7)
     cleaned_text = extract_json_from_text(text)
 
     try:
@@ -388,12 +366,12 @@ CRITICAL RULES:
 
 
 def generate_behavioral_report(question, answer_text, job_title, experience_level,
-                                video_metrics=None, audio_metrics=None):
+                               video_metrics=None, audio_metrics=None):
     """
-    Uses ACTIVE_MODEL to synthesize verbal (answer content) + non-verbal (video)
-    + vocal-delivery (audio) signals into one combined feedback report.
+    Synthesizes verbal (answer content) + non-verbal (video) + vocal-delivery
+    (audio) signals into one combined feedback report.
     video_metrics / audio_metrics may be None or contain an 'error' key if that
-    modality wasn't available — the prompt is built to degrade gracefully.
+    modality wasn't available; the prompt degrades gracefully.
     """
     video_block = "Not available."
     if video_metrics and "error" not in video_metrics:
@@ -488,8 +466,7 @@ Rules: all scores 0-10 integers, arrays 2-3 items, return ONLY JSON."""
 
 def _build_signal_blocks(answer_text, video_metrics, audio_metrics):
     """Shared helper: turns raw video/audio metrics into short prompt-ready
-    summary strings. Used by both the old single-question report function
-    and the new batched one below."""
+    summary strings."""
     video_block = "Not available."
     if video_metrics and "error" not in video_metrics:
         posture = video_metrics.get('postureScore')
@@ -530,12 +507,9 @@ def generate_batch_behavioral_report(items, job_title, experience_level):
       {"index": int, "question": str, "answerText": str, "isCoding": bool,
        "videoMetrics": dict|None, "audioMetrics": dict|None}
 
-    Coding items may now ALSO carry videoMetrics/audioMetrics if the person
-    recorded themselves while coding (recording is mandatory for every
-    non-skipped question, coding or not). When that happens we don't discard
-    the signal — we use it to note attentiveness (looking away, long
-    unexplained silences, speech not matching what's typed), while keeping
-    contentScore based purely on code quality/correctness.
+    Coding items may also carry videoMetrics/audioMetrics if the person
+    recorded themselves while coding. The signal is used only for a neutral
+    attentiveness note; contentScore stays based purely on code quality.
 
     Returns raw text (expected to be JSON: {"results": [...]}).
     """
@@ -624,12 +598,12 @@ all scores 0-10 integers, arrays 2-3 items, return ONLY JSON."""
 
 def generate_executive_summary(job_title, experience_level, per_question_results, overall_pct):
     """
-    Synthesizes ALL scored answers (content + delivery + body language) into
-    one short, panel-style executive summary paragraph for the top of the report.
+    Synthesizes ALL scored answers into one short, panel-style executive
+    summary paragraph for the top of the report.
     per_question_results: list of dicts, each with at least
       {"question": str, "contentScore": int, "deliveryScore": int, "isCoding": bool}
     Returns a plain-text paragraph, or None if generation fails (caller should
-    fall back gracefully — this is a nice-to-have, not a blocker).
+    fall back gracefully).
     """
     lines = []
     for r in per_question_results:
