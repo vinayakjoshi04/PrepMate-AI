@@ -9,6 +9,7 @@ python-docx
 reportlab
 huggingface_hub
 transformers
+tokenizers
 accelerate
 torch
 librosa
