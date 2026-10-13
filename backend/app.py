@@ -4,10 +4,12 @@
 # live in interview.py (Blueprint).
 # Resume-analysis logic lives in resumeanalyzer.py.
 # Skill-gap logic lives in skillgap_analysis.py.
+# Recruiter-side routes (match, JD draft, interview kit, templates) live in
+# recruiter.py (Blueprint, /api/recruiter/*).
 # Recordings are stored on local disk (uploads/recordings/) and served via
 # /api/recordings/<path>.
 #
-# requires: pip install flask flask-cors python-docx reportlab PyPDF2
+# requires: pip install flask flask-cors python-docx reportlab PyPDF2 requests
 
 import io
 import logging
@@ -23,6 +25,7 @@ from werkzeug.utils import secure_filename
 
 from audio_analysis import preload_whisper
 from interview import interview_bp
+from recruiter import recruiter_bp
 import resumeanalyzer as ra
 from skillgap_analysis import analyze_skill_gap
 
@@ -55,7 +58,7 @@ if extra_origin:
 CORS(app, resources={
     r"/api/*": {
         "origins": ALLOWED_ORIGINS,
-        "methods": ["GET", "POST", "OPTIONS"],
+        "methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization"],
         "supports_credentials": True,
         "max_age": 3600,
@@ -63,6 +66,7 @@ CORS(app, resources={
 })
 
 app.register_blueprint(interview_bp)
+app.register_blueprint(recruiter_bp)
 
 # ─── Config ───────────────────────────────────────────────────────────────────
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -88,6 +92,10 @@ ENDPOINTS = {
     "export_resume": "/api/export-resume",
     "skill_gap": "/api/skill-gap",
     "recordings": "/api/recordings/<path>",
+    "recruiter_match": "/api/recruiter/match",
+    "recruiter_generate_jd": "/api/recruiter/generate-jd",
+    "recruiter_interview_questions": "/api/recruiter/interview-questions",
+    "recruiter_message_template": "/api/recruiter/message-template",
 }
 
 
